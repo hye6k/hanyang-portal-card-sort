@@ -248,13 +248,11 @@ function updateCard(point) {
     const dx = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x - gesture.original.x, -10000 - Math.min(...originals.map(p => p.x)), 10000 - Math.max(...originals.map(p => p.x)));
     const dy = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y - gesture.original.y, -10000 - Math.min(...originals.map(p => p.y)), 10000 - Math.max(...originals.map(p => p.y)));
     for (const id of gesture.ids) { state.positions[id].x = gesture.snapshot[id].x + dx; state.positions[id].y = gesture.snapshot[id].y + dy; }
-    pushNeighbours();
     return;
   }
   const p = state.positions[gesture.id];
   p.x = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x, -10000, 10000);
   p.y = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y, -10000, 10000);
-  pushNeighbours();
 }
 function collisionContact(a, b, clearance) {
   // Minkowski sum of two rounded cards plus the requested separation.
