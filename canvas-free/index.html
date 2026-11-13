@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f2f5f8">
+  <meta name="robots" content="noindex,nofollow">
+  <title>자유 배치 카드 소팅 · 자유 이동</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css?v=free-1">
+</head>
+<body>
+  <main id="viewport" aria-label="카드를 자유롭게 배치하는 평면"><div id="world"><div id="outlines"></div><div id="cards"></div></div></main>
+  <p id="hint" class="hint">카드 끌기 · 0.5초 꾹 누르면 묶음 이동</p>
+  <nav class="controls" aria-label="평면 조작"><button type="button" data-action="zoom-out" class="icon-button" aria-label="축소">−</button><span id="zoom" class="zoom">100%</span><button type="button" data-action="zoom-in" class="icon-button" aria-label="확대">＋</button><span class="divider"></span><button type="button" data-action="fit" class="small-button" aria-label="전체 카드 보기">전체</button><button type="button" data-action="undo" class="icon-button" aria-label="마지막 이동 되돌리기" disabled>↶</button><button type="button" data-action="review" class="review-button">묶음 확인</button></nav>
+  <button type="button" data-action="reset-test" class="reset-test" title="배치와 분류를 지우고 다시 시작" aria-label="저장된 테스트 배치와 분류 초기화">초기화</button>
+  <dialog id="review" aria-label="묶음 확인"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <noscript>카드를 배치하려면 JavaScript를 사용할 수 있어야 한다.</noscript>
+  <script type="module" src="./app.js?v=free-1"></script>
+</body>
+</html>
