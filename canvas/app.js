@@ -134,9 +134,10 @@ function drawOutlines() {
     const right = Math.max(...positions.map(p => p.x + CARD_W)) + 16;
     const bottom = Math.max(...positions.map(p => p.y + CARD_H)) + 16;
     const anchor = [...positions].sort((a, b) => a.y - b.y || a.x - b.x)[0];
-    const label = group.held ? `${group.cardIds.length}개 · 함께 이동` : confirmed ? group.name : `${group.cardIds.length}개 · 묶음 후보`;
+    const label = group.held ? `${group.cardIds.length}개 · 함께 이동` : confirmed ? group.name : null;
+    const labelMarkup = label ? `<span style="left:${anchor.x - x + 4}px;top:${anchor.y - y - 21}px">${escape(label)}</span>` : '';
     const width = right - x, height = bottom - y;
-    return `<div aria-hidden="true" class="group-outline ${confirmed ? 'confirmed' : 'preview'} ${group.held ? 'group-held' : ''} tone-${group.tone ?? index % 4}" data-cards="${group.cardIds.join(',')}" style="left:${x}px;top:${y}px;width:${width}px;height:${height}px"><svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path fill-rule="evenodd" d="${roundedContour(positions, x, y)}"/></svg><span style="left:${anchor.x - x + 4}px;top:${anchor.y - y - 21}px">${escape(label)}</span></div>`;
+    return `<div aria-hidden="true" class="group-outline ${confirmed ? 'confirmed' : 'preview'} ${group.held ? 'group-held' : ''} tone-${group.tone ?? index % 4}" data-cards="${group.cardIds.join(',')}" style="left:${x}px;top:${y}px;width:${width}px;height:${height}px"><svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path fill-rule="evenodd" d="${roundedContour(positions, x, y)}"/></svg>${labelMarkup}</div>`;
   }).join('');
   if (markup !== outlineMarkup) { outlines.innerHTML = markup; outlineMarkup = markup; }
 }
