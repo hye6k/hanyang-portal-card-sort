@@ -59,9 +59,9 @@ function render() {
   const positions = [...document.querySelectorAll('[data-scroll]')].map(el => [el.dataset.scroll, el.scrollTop]);
   const assigned = new Set(state.groups.flatMap(group => group.cardIds));
   const pool = state.order.filter(id => !assigned.has(id));
-  app.innerHTML = `<header class="header"><div class="header-inner"><div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>카드 합치기</strong><span class="badge">드래그 테스트</span></div><div class="header-actions"><button type="button" data-action="undo" class="quiet-button" ${history.length ? '' : 'disabled'}><span aria-hidden="true">↶</span> 되돌리기</button><button type="button" data-action="reset" class="reset-button">처음부터</button></div></div></header>
+  app.innerHTML = `<header class="header"><div class="header-inner"><div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>카드 합치기</strong><span class="badge">드래그 테스트</span><span class="mobile-progress" aria-label="30개 중 ${assigned.size}개 분류">${assigned.size}<span>/30</span></span></div><div class="header-actions"><button type="button" data-action="help" class="help-button" aria-label="조작 안내">?</button><button type="button" data-action="undo" class="quiet-button" aria-label="되돌리기" ${history.length ? '' : 'disabled'}><span aria-hidden="true">↶</span> 되돌리기</button><button type="button" data-action="reset" class="reset-button">처음부터</button></div></div></header>
     <main id="main"><section class="intro"><div><p class="eyebrow">명칭 카드 30개 · 자유롭게 묶기</p><h1>끌어서, 하나로.</h1><p class="desktop-instruction">카드를 겹치면 새 묶음이 된다. 묶음 위에 놓으면 그 안으로 들어간다.</p><p class="mobile-instruction">오른쪽 <strong>점무늬</strong>를 잡고 다른 카드나 묶음에 놓는다.</p></div><div class="counter"><strong>${assigned.size}</strong><span> / 30</span><small>묶은 카드</small></div></section>
-    <div class="board"><section class="pool-panel panel" aria-labelledby="pool-title"><div class="panel-heading" data-drop-pool><div><h2 id="pool-title">아직 묶지 않은 카드 <span>${pool.length}</span></h2><p>카드 위에 다른 카드를 놓으면 된다.</p></div><span class="panel-symbol" aria-hidden="true">▦</span></div><div class="panel-scroll pool-scroll" data-scroll="pool" data-drop-pool><div class="pool-grid">${pool.map(cardHTML).join('')}</div>${pool.length ? '' : '<div class="pool-empty"><span aria-hidden="true">✓</span><h3>카드 30개를 모두 묶었다.</h3><p>묶음에서 다시 끌어 옮길 수 있다.</p></div>'}</div></section>
+    <div class="board ${state.groups.length ? 'has-groups' : 'is-empty'}"><section class="pool-panel panel" aria-labelledby="pool-title"><div class="panel-heading" data-drop-pool><div><h2 id="pool-title">아직 묶지 않은 카드 <span>${pool.length}</span></h2><p>카드 위에 다른 카드를 놓으면 된다.</p></div><span class="panel-symbol" aria-hidden="true">▦</span></div><div class="panel-scroll pool-scroll" data-scroll="pool" data-drop-pool><div class="pool-grid">${pool.map(cardHTML).join('')}</div>${pool.length ? '' : '<div class="pool-empty"><span aria-hidden="true">✓</span><h3>카드 30개를 모두 묶었다.</h3><p>묶음에서 다시 끌어 옮길 수 있다.</p></div>'}</div></section>
     <section class="groups-panel panel" aria-labelledby="groups-title"><div class="panel-heading"><div><h2 id="groups-title">내가 만든 묶음 <span>${state.groups.length}</span></h2><p>묶음끼리도 끌어서 합칠 수 있다.</p></div><span class="panel-symbol" aria-hidden="true">▤</span></div><div class="panel-scroll groups-scroll" data-scroll="groups"><div class="group-grid">${state.groups.length ? state.groups.map((group, index) => `<section class="group tone-${index % 4}" data-node="group" data-id="${escape(group.id)}"><div class="group-header" data-group-header><span class="group-dot" aria-hidden="true"></span><label class="group-label"><span class="sr-only">${index + 1}번째 묶음 이름</span><input class="group-name" type="text" value="${escape(group.name)}" placeholder="묶음 이름" maxlength="60" autocomplete="off" data-rename="${escape(group.id)}" data-focus="name-${escape(group.id)}"></label><span class="group-count">${group.cardIds.length}</span>${grip('group', group.id, groupName(group))}<button type="button" class="dissolve" data-action="dissolve" data-id="${escape(group.id)}" aria-label="${escape(groupName(group))} 풀기">×</button></div><div class="group-cards">${group.cardIds.map(cardHTML).join('')}</div></section>`).join('') : '<div class="groups-empty"><div class="empty-art" aria-hidden="true"><i></i><span>＋</span><i></i></div><h3>두 카드를 겹쳐 첫 묶음을 만든다.</h3><p>카드끼리 합친 뒤 이름을 바꿀 수 있다.</p><span class="empty-note">묶음 개수는 자유이다.</span></div>'}</div></div></section></div>
     <footer class="workspace-footer"><span class="footer-guide"><span class="guide-dot"></span> 카드를 꺼내려면 미분류 영역으로 끈다.</span><button type="button" class="return-zone" data-drop-pool data-action="keyboard-return">↩ <span>카드로 꺼내기</span></button></footer>
     <p id="keyboard-help" class="sr-only">점무늬 버튼에서 Enter 또는 Space를 누르면 집어 든다. 합칠 대상의 점무늬에서 다시 누르면 놓는다. Escape로 취소할 수 있다. 카드로 꺼내기 버튼으로 묶음에서 꺼낼 수 있다.</p></main>`;
@@ -130,8 +130,14 @@ function combine(source, destination) {
 function nodesFor(source) {
   return [...document.querySelectorAll(`[data-node="${source.kind}"][data-id="${CSS.escape(source.id)}"]`)];
 }
-function markSource(source) { nodesFor(source).forEach(el => el.classList.add('picked-source')); }
-function clearMarks() { document.querySelectorAll('.picked-source,.drop-target,.drop-pool-active').forEach(el => el.classList.remove('picked-source', 'drop-target', 'drop-pool-active')); }
+function markSource(source) {
+  nodesFor(source).forEach(el => el.classList.add('picked-source'));
+  document.body.classList.toggle('can-return', source.kind === 'card' && !!groupForCard(source.id));
+}
+function clearMarks() {
+  document.querySelectorAll('.picked-source,.drop-target,.drop-pool-active').forEach(el => el.classList.remove('picked-source', 'drop-target', 'drop-pool-active'));
+  document.body.classList.remove('can-return');
+}
 function targetLabel(destination) {
   if (!destination) return '합칠 카드나 묶음 위에 놓는다.';
   if (destination.kind === 'card') return '놓으면 새 묶음이 된다.';
@@ -272,7 +278,10 @@ document.addEventListener('click', event => {
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled) return;
   const { action, id } = button.dataset;
-  if (action === 'undo' && history.length) {
+  if (action === 'help') {
+    confirmation.innerHTML = '<h2 id="confirmation-title">카드 묶기</h2><p>오른쪽 점무늬를 잡고 끈다.<br>카드 위에 놓으면 새 묶음이 된다.<br>기존 묶음 위에 놓으면 그 안에 들어간다.<br>묶음끼리도 합칠 수 있다.<br>묶음에서 꺼낼 때는 미분류 영역으로 끈다.</p><div class="confirmation-actions"><button type="button" class="reset-button" data-action="cancel" autofocus>닫기</button></div>';
+    confirmation.showModal();
+  } else if (action === 'undo' && history.length) {
     state = JSON.parse(history.pop()); keyboardSource = null; save(); render(); notify('이전 분류로 되돌렸다.');
   } else if (action === 'reset') ask('처음부터 다시 묶을까?', '현재 묶음을 풀고 카드 30개를 다시 펼친다.', { kind: 'reset' });
   else if (action === 'dissolve') ask('이 묶음을 풀까?', '포함된 카드가 미분류 영역으로 돌아간다.', { kind: 'dissolve', id });
