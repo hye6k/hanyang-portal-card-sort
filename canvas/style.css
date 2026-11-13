@@ -14,3 +14,5 @@
 
 /* Rounded union follows each card instead of filling the bounding rectangle. */
 .group-outline.preview,.group-outline.confirmed,.group-outline.tone-1,.group-outline.tone-2,.group-outline.tone-3{border:0;background:transparent;border-radius:0}.group-outline>svg{position:absolute;inset:0;overflow:visible;pointer-events:none}.group-outline path{fill:var(--area-fill);stroke:var(--area-border);stroke-width:1.5;stroke-linejoin:round;stroke-dasharray:4 4}.group-outline.confirmed path{stroke-width:2;stroke-dasharray:none}.group-outline>span{max-width:170px;pointer-events:none}
+
+.card,#viewport{-webkit-touch-callout:none}.card.group-held{border-color:#2983ad;box-shadow:0 0 0 2px #62aad23d,0 5px 16px #234c6919}.group-outline.group-held path{stroke:#348daf;stroke-width:2.5;stroke-dasharray:none;fill:rgb(87 164 205 / 20%)}.group-outline.group-held>span{color:#286e91;font-weight:700}

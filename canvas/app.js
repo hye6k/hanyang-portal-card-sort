@@ -42,11 +42,35 @@ let toastTimer;
 let lastTap = null;
 let outlineMarkup = '';
 let previewGroups = [];
+let holdTimer;
+const isCardGesture = () => gesture?.type === 'card' || gesture?.type === 'group';
+function cancelHold() { clearTimeout(holdTimer); holdTimer = null; }
+function restoreDrag() {
+  if (gesture?.type === 'group') for (const id of gesture.ids) state.positions[id] = { ...gesture.snapshot[id] };
+  else if (gesture?.type === 'card') state.positions[gesture.id] = { ...gesture.original };
+}
+function armGroupHold() {
+  const pending = gesture;
+  holdTimer = setTimeout(() => {
+    if (gesture !== pending || pending.moved || pointers.size !== 1) return;
+    const confirmedGroup = state.confirmed && state.review?.groups.find(group => group.cardIds.includes(pending.id));
+    const ids = confirmedGroup?.cardIds || spatialClusters().find(ids => ids.includes(pending.id));
+    if (!ids || ids.length < 2) return;
+    pending.type = 'group'; pending.ids = [...ids]; pending.groupName = confirmedGroup?.name;
+    lastTap = null;
+    notify(`${ids.length}개 묶음을 함께 이동한다.`);
+    paint();
+  }, 1000);
+}
 
 function save() { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {} }
 function announce(text) { document.querySelector('#announcer').textContent = text; }
 function notify(text) { const el = document.querySelector('#toast'); clearTimeout(toastTimer); el.textContent = text; el.classList.add('visible'); toastTimer = setTimeout(() => el.classList.remove('visible'), 2600); announce(text); }
-function remember(snapshot) { history.push(snapshot); if (history.length > 20) history.shift(); updateControls(); }
+function remember(snapshot, preserveClassification = false) {
+  history.push({ positions: snapshot, classification: preserveClassification ? { review: copy(state.review), confirmed: state.confirmed, confirmedAt: state.confirmedAt } : null });
+  if (history.length > 20) history.shift();
+  updateControls();
+}
 function invalidate() { state.review = null; state.confirmed = false; drawOutlines(); updateControls(); }
 function updateControls() {
   document.querySelector('#zoom').textContent = `${Math.round(state.view.scale * 100)}%`;
@@ -69,7 +93,9 @@ function paint() {
     el.style.transform = `translate3d(${p.x}px,${p.y}px,0)`;
     el.style.zIndex = p.z;
     el.classList.toggle('selected', card.id === selectedId);
-    el.classList.toggle('moving', gesture?.type === 'card' && gesture.id === card.id && gesture.moved);
+    const inGroup = gesture?.type === 'group' && gesture.ids.includes(card.id);
+    el.classList.toggle('moving', isCardGesture() && gesture.moved && (gesture.id === card.id || inGroup));
+    el.classList.toggle('group-held', inGroup);
   }
   drawOutlines();
   updateControls();
@@ -77,7 +103,11 @@ function paint() {
 
 function drawOutlines() {
   const confirmed = state.confirmed && state.review && !(gesture?.type === 'card' && gesture.moved);
-  const groups = confirmed ? state.review.groups : spatialClusters().filter(ids => ids.length > 1).map(cardIds => ({ cardIds }));
+  let groups = confirmed ? state.review.groups : spatialClusters().filter(ids => ids.length > 1).map(cardIds => ({ cardIds }));
+  if (gesture?.type === 'group') {
+    groups = groups.map(group => ({ ...group, cardIds: group.cardIds.filter(id => !gesture.ids.includes(id)) })).filter(group => group.cardIds.length > 1);
+    groups.push({ cardIds: gesture.ids, name: gesture.groupName, held: true });
+  }
   if (!confirmed) {
     // Keep each area's colour while cards enter, leave, or reorder the clusters.
     const available = new Set(previewGroups);
@@ -101,9 +131,9 @@ function drawOutlines() {
     const right = Math.max(...positions.map(p => p.x + CARD_W)) + 16;
     const bottom = Math.max(...positions.map(p => p.y + CARD_H)) + 16;
     const anchor = [...positions].sort((a, b) => a.y - b.y || a.x - b.x)[0];
-    const label = confirmed ? group.name : `${group.cardIds.length}개 · 묶음 후보`;
+    const label = group.held ? `${group.cardIds.length}개 · 함께 이동` : confirmed ? group.name : `${group.cardIds.length}개 · 묶음 후보`;
     const width = right - x, height = bottom - y;
-    return `<div aria-hidden="true" class="group-outline ${confirmed ? 'confirmed' : 'preview'} tone-${group.tone ?? index % 4}" data-cards="${group.cardIds.join(',')}" style="left:${x}px;top:${y}px;width:${width}px;height:${height}px"><svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path fill-rule="evenodd" d="${roundedContour(positions, x, y)}"/></svg><span style="left:${anchor.x - x + 4}px;top:${anchor.y - y - 21}px">${escape(label)}</span></div>`;
+    return `<div aria-hidden="true" class="group-outline ${confirmed ? 'confirmed' : 'preview'} ${group.held ? 'group-held' : ''} tone-${group.tone ?? index % 4}" data-cards="${group.cardIds.join(',')}" style="left:${x}px;top:${y}px;width:${width}px;height:${height}px"><svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path fill-rule="evenodd" d="${roundedContour(positions, x, y)}"/></svg><span style="left:${anchor.x - x + 4}px;top:${anchor.y - y - 21}px">${escape(label)}</span></div>`;
   }).join('');
   if (markup !== outlineMarkup) { outlines.innerHTML = markup; outlineMarkup = markup; }
 }
@@ -191,6 +221,13 @@ function focusCard(id) {
 }
 
 function updateCard(point) {
+  if (gesture.type === 'group') {
+    const originals = gesture.ids.map(id => gesture.snapshot[id]);
+    const dx = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x - gesture.original.x, -10000 - Math.min(...originals.map(p => p.x)), 10000 - Math.max(...originals.map(p => p.x)));
+    const dy = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y - gesture.original.y, -10000 - Math.min(...originals.map(p => p.y)), 10000 - Math.max(...originals.map(p => p.y)));
+    for (const id of gesture.ids) { state.positions[id].x = gesture.snapshot[id].x + dx; state.positions[id].y = gesture.snapshot[id].y + dy; }
+    return;
+  }
   const p = state.positions[gesture.id];
   p.x = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x, -10000, 10000);
   p.y = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y, -10000, 10000);
@@ -223,13 +260,47 @@ function settleCard(id) {
   Object.assign(position, nearest);
   return true;
 }
+function settleGroup(ids) {
+  const members = ids.map(id => state.positions[id]);
+  const others = catalog.filter(card => !ids.includes(card.id)).map(card => state.positions[card.id]);
+  const free = (dx, dy) => members.every(p => others.every(other => !overlaps({ x: p.x + dx, y: p.y + dy }, other, CARD_CLEARANCE)));
+  if (free(0, 0)) return false;
+  const candidates = [];
+  // Resolve external overlaps by translating the whole group along one axis.
+  // Merging forbidden intervals avoids an expensive search over all card pairs.
+  for (const axis of ['x', 'y']) {
+    const intervals = [];
+    const size = axis === 'x' ? CARD_W : CARD_H;
+    for (const p of members) for (const other of others) {
+      const aligned = axis === 'x' ? Math.abs((p.y + CARD_H / 2) - (other.y + CARD_H / 2)) < CARD_H + CARD_CLEARANCE - .001 : Math.abs((p.x + CARD_W / 2) - (other.x + CARD_W / 2)) < CARD_W + CARD_CLEARANCE - .001;
+      if (aligned) intervals.push([other[axis] - p[axis] - size - CARD_CLEARANCE, other[axis] - p[axis] + size + CARD_CLEARANCE]);
+    }
+    intervals.sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    for (const interval of intervals) {
+      const last = merged[merged.length - 1];
+      if (last && interval[0] < last[1]) last[1] = Math.max(last[1], interval[1]);
+      else merged.push([...interval]);
+    }
+    for (const [left, right] of merged) if (left < 0 && right > 0) {
+      for (const shift of [left, right]) {
+        const dx = axis === 'x' ? shift : 0, dy = axis === 'y' ? shift : 0;
+        if (members.every(p => p.x + dx >= -10000 && p.x + dx <= 10000 && p.y + dy >= -10000 && p.y + dy <= 10000) && free(dx, dy)) candidates.push({ dx, dy });
+      }
+    }
+  }
+  const best = candidates.sort((a, b) => Math.hypot(a.dx, a.dy) - Math.hypot(b.dx, b.dy))[0];
+  if (!best) { restoreDrag(); notify('이 위치에는 묶음을 놓을 공간이 부족하다.'); return false; }
+  for (const p of members) { p.x += best.dx; p.y += best.dy; }
+  return true;
+}
 function animateSettling(id) {
   const element = cardsElement.querySelector(`[data-id="${id}"]`);
   element.classList.add('settling');
   setTimeout(() => element.classList.remove('settling'), 200);
 }
 function edgePan() {
-  if (gesture?.type !== 'card' || !gesture.moved) return;
+  if (!isCardGesture() || !gesture.moved) return;
   const point = pointers.values().next().value;
   if (!point) return;
   const edge = 30;
@@ -245,12 +316,13 @@ function stopAnimation() { if (animation) cancelAnimationFrame(animation); anima
 
 viewport.addEventListener('pointerdown', event => {
   if (event.button !== 0 || reviewDialog.open || pointers.size >= 2) return;
+  cancelHold();
   hint.classList.add('hidden');
   event.preventDefault();
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   viewport.setPointerCapture(event.pointerId);
   if (pointers.size === 2) {
-    if (gesture?.type === 'card') state.positions[gesture.id] = gesture.original;
+    restoreDrag();
     stopAnimation();
     const [a, b] = [...pointers.values()];
     const center = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
@@ -264,6 +336,7 @@ viewport.addEventListener('pointerdown', event => {
     const original = { ...state.positions[id] };
     selectedId = id;
     gesture = { type: 'card', id, start, original, snapshot: copy(state.positions), moved: false, offset: { x: (start.x - state.view.x) / state.view.scale - original.x, y: (start.y - state.view.y) / state.view.scale - original.y } };
+    armGroupHold();
   } else { selectedId = null; gesture = { type: 'pan', start, view: { ...state.view } }; }
   paint();
 });
@@ -281,10 +354,13 @@ viewport.addEventListener('pointermove', event => {
   } else if (gesture.type === 'pan') {
     state.view.x = gesture.view.x + point.x - gesture.start.x;
     state.view.y = gesture.view.y + point.y - gesture.start.y;
-  } else if (gesture.type === 'card') {
+  } else if (isCardGesture()) {
     if (!gesture.moved && Math.hypot(point.x - gesture.start.x, point.y - gesture.start.y) >= 4) {
+      cancelHold();
       gesture.moved = true;
-      state.positions[gesture.id].z = Math.max(...Object.values(state.positions).map(p => p.z)) + 1;
+      let z = Math.max(...Object.values(state.positions).map(p => p.z));
+      const ids = gesture.type === 'group' ? [...gesture.ids].sort((a, b) => gesture.snapshot[a].z - gesture.snapshot[b].z) : [gesture.id];
+      for (const id of ids) state.positions[id].z = ++z;
       animation = requestAnimationFrame(edgePan);
     }
     if (gesture.moved) updateCard(point);
@@ -294,6 +370,7 @@ viewport.addEventListener('pointermove', event => {
 
 function finishPointer(event, cancelled = false) {
   if (!pointers.has(event.pointerId)) return;
+  cancelHold();
   pointers.delete(event.pointerId);
   if (gesture?.type === 'pinch' && pointers.size === 1) {
     const start = pointers.values().next().value;
@@ -302,13 +379,19 @@ function finishPointer(event, cancelled = false) {
   }
   if (!pointers.size) {
     stopAnimation();
-    if (gesture?.type === 'card') {
-      if (cancelled) state.positions[gesture.id] = gesture.original;
+    if (isCardGesture()) {
+      if (cancelled) restoreDrag();
       else if (gesture.moved) {
-        if (settleCard(gesture.id)) animateSettling(gesture.id);
-        remember(gesture.snapshot); invalidate();
+        if (gesture.type === 'group') {
+          if (settleGroup(gesture.ids)) gesture.ids.forEach(animateSettling);
+          remember(gesture.snapshot, true);
+          if (!state.confirmed) invalidate();
+        } else {
+          if (settleCard(gesture.id)) animateSettling(gesture.id);
+          remember(gesture.snapshot); invalidate();
+        }
       }
-      else {
+      else if (gesture.type === 'card') {
         if (lastTap?.id === gesture.id && Date.now() - lastTap.time < 330) focusCard(gesture.id);
         lastTap = { id: gesture.id, time: Date.now() };
       }
@@ -319,9 +402,10 @@ function finishPointer(event, cancelled = false) {
 viewport.addEventListener('pointerup', event => finishPointer(event));
 viewport.addEventListener('pointercancel', event => finishPointer(event, true));
 window.addEventListener('blur', () => {
-  if (gesture?.type === 'card') state.positions[gesture.id] = gesture.original;
+  cancelHold(); restoreDrag();
   pointers.clear(); gesture = null; stopAnimation(); paint(); save();
 });
+viewport.addEventListener('contextmenu', event => event.preventDefault());
 viewport.addEventListener('wheel', event => {
   event.preventDefault(); hint.classList.add('hidden');
   if (event.ctrlKey || event.metaKey) zoomAt(event.clientX, event.clientY, state.view.scale * Math.exp(-event.deltaY * 0.008));
@@ -388,7 +472,13 @@ document.addEventListener('click', event => {
   const action = button.dataset.action;
   if (action === 'zoom-in' || action === 'zoom-out') { zoomAt(innerWidth / 2, (innerHeight - 70) / 2, state.view.scale * (action === 'zoom-in' ? 1.25 : 0.8)); save(); }
   else if (action === 'fit') fitAll();
-  else if (action === 'undo' && history.length) { state.positions = history.pop(); invalidate(); paint(); save(); }
+  else if (action === 'undo' && history.length) {
+    const previous = history.pop();
+    state.positions = previous.positions;
+    if (previous.classification) Object.assign(state, previous.classification);
+    else invalidate();
+    paint(); save();
+  }
   else if (action === 'review') showReview();
   else if (action === 'back') { reviewDialog.close(); updateControls(); save(); }
   else if (action === 'split') {
