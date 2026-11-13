@@ -438,8 +438,10 @@ window.addEventListener('blur', () => {
 viewport.addEventListener('contextmenu', event => event.preventDefault());
 viewport.addEventListener('wheel', event => {
   event.preventDefault(); hint.classList.add('hidden');
-  if (event.ctrlKey || event.metaKey) zoomAt(event.clientX, event.clientY, state.view.scale * Math.exp(-event.deltaY * 0.008));
-  else { state.view.x -= event.deltaX; state.view.y -= event.deltaY; paint(); }
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
+  const delta = clamp(event.deltaY * unit, -240, 240);
+  const sensitivity = event.ctrlKey || event.metaKey ? .008 : .002;
+  zoomAt(event.clientX, event.clientY, state.view.scale * Math.exp(-delta * sensitivity));
   save();
 }, { passive: false });
 viewport.addEventListener('keydown', event => {
