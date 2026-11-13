@@ -490,13 +490,12 @@ function inferGroups() {
   return { groups, singles, nextGroup: groups.length + 1, inferred: { groups: copy(groups), singles: [...singles] } };
 }
 
-function moveSelect(id, current) {
-  return `<select data-move-card="${id}" aria-label="${escape(cardName(id))} 묶음 변경"><option value="">옮기기</option>${state.review.groups.filter(g => g.id !== current).map(g => `<option value="${g.id}">${escape(g.name)}</option>`).join('')}${current ? '<option value="single">따로 두기</option>' : ''}<option value="new">새 묶음</option></select>`;
+function reviewRows(ids) {
+  return ids.map(id => `<div class="review-card">${escape(cardName(id))}</div>`).join('');
 }
-function reviewRows(ids, current) { return ids.map(id => `<div class="review-card"><span>${escape(cardName(id))}</span>${moveSelect(id, current)}</div>`).join(''); }
 function renderReview() {
   const result = state.review;
-  reviewDialog.innerHTML = `<div class="review-heading"><div><p class="eyebrow">${state.confirmed ? '확정한 분류' : '배치를 바탕으로 한 제안'}</p><h1>이렇게 묶으면 맞는가?</h1><p>가까이 놓인 카드끼리 제안했다. 다르면 옮기거나 배치로 돌아가 수정할 수 있다.</p></div><button type="button" class="close-review" data-action="back" aria-label="배치로 돌아가기">×</button></div><div class="review-scroll"><p class="review-count">묶음 ${result.groups.length}개 <span>·</span> 따로 둔 카드 ${result.singles.length}개</p><div class="review-groups">${result.groups.map((g, i) => `<section class="review-group tone-${i % 4}"><div class="review-group-heading"><label><span class="sr-only">묶음 이름</span><input type="text" data-group-name="${g.id}" value="${escape(g.name)}" maxlength="60" aria-label="${i + 1}번째 묶음 이름"></label><span>${g.cardIds.length}개</span><button type="button" data-action="split" data-id="${g.id}">풀기</button></div>${reviewRows(g.cardIds, g.id)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 놓인 카드</h2><p>혼자 두려는 카드라면 그대로 확정해도 된다.</p>${reviewRows(result.singles, null)}</section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">배치로 돌아가기</button><button type="button" class="confirm-button" data-action="confirm">${state.confirmed ? '확인 완료' : '이 분류로 확정'}</button></div>`;
+  reviewDialog.innerHTML = `<div class="review-heading"><h1>묶음 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group tone-${index % 4}"><div class="review-group-heading"><label><span class="sr-only">묶음 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="묶음 이름" maxlength="60" aria-label="${index + 1}번째 묶음 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">${state.confirmed ? '완료' : '확정'}</button></div>`;
 }
 function showReview() {
   if (!state.review) state.review = inferGroups();
@@ -530,36 +529,17 @@ document.addEventListener('click', event => {
   }
   else if (action === 'review') showReview();
   else if (action === 'back') { reviewDialog.close(); updateControls(); save(); }
-  else if (action === 'split') {
-    const group = state.review.groups.find(g => g.id === button.dataset.id);
-    state.review.singles.push(...group.cardIds);
-    state.review.groups = state.review.groups.filter(g => g.id !== group.id);
-    state.confirmed = false; save(); renderReview(); drawOutlines();
-  } else if (action === 'confirm') {
+  else if (action === 'confirm') {
     state.review.groups.forEach((g, i) => { g.name = g.name.trim() || `묶음 ${i + 1}`; });
     const ids = [...state.review.singles, ...state.review.groups.flatMap(g => g.cardIds)];
     if (ids.length !== 30 || new Set(ids).size !== 30) { notify('카드 분류를 다시 확인해야 한다.'); return; }
     state.confirmed = true; state.confirmedAt = new Date().toISOString();
-    reviewDialog.close(); drawOutlines(); updateControls(); save(); notify('확인한 묶음으로 분류를 확정했다.');
+    reviewDialog.close(); drawOutlines(); updateControls(); save(); announce('분류를 확정했다.');
   }
 });
 reviewDialog.addEventListener('input', event => {
   const group = state.review.groups.find(g => g.id === event.target.dataset.groupName);
   if (group) { group.name = event.target.value; state.confirmed = false; drawOutlines(); updateControls(); save(); }
-});
-reviewDialog.addEventListener('change', event => {
-  const id = event.target.dataset.moveCard, destination = event.target.value;
-  if (!id || !destination) return;
-  state.review.singles = state.review.singles.filter(value => value !== id);
-  for (const group of state.review.groups) group.cardIds = group.cardIds.filter(value => value !== id);
-  if (destination === 'single') state.review.singles.push(id);
-  else if (destination === 'new') {
-    state.review.nextGroup ||= state.review.groups.length + 1;
-    state.review.groups.push({ id: crypto.randomUUID(), name: `묶음 ${state.review.nextGroup++}`, cardIds: [id] });
-  }
-  else state.review.groups.find(g => g.id === destination).cardIds.push(id);
-  state.review.groups = state.review.groups.filter(g => g.cardIds.length);
-  state.confirmed = false; save(); renderReview(); drawOutlines();
 });
 window.addEventListener('resize', paint);
 setTimeout(() => hint.classList.add('hidden'), 6500);
