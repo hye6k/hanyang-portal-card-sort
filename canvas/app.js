@@ -96,14 +96,74 @@ function drawOutlines() {
   }
   const markup = groups.map((group, index) => {
     const positions = group.cardIds.map(id => state.positions[id]);
-    const x = Math.min(...positions.map(p => p.x)) - 12;
-    const y = Math.min(...positions.map(p => p.y)) - (confirmed ? 30 : 24);
-    const right = Math.max(...positions.map(p => p.x + CARD_W)) + 12;
-    const bottom = Math.max(...positions.map(p => p.y + CARD_H)) + 12;
+    const x = Math.min(...positions.map(p => p.x)) - 16;
+    const y = Math.min(...positions.map(p => p.y)) - 24;
+    const right = Math.max(...positions.map(p => p.x + CARD_W)) + 16;
+    const bottom = Math.max(...positions.map(p => p.y + CARD_H)) + 16;
+    const anchor = [...positions].sort((a, b) => a.y - b.y || a.x - b.x)[0];
     const label = confirmed ? group.name : `${group.cardIds.length}개 · 묶음 후보`;
-    return `<div aria-hidden="true" class="group-outline ${confirmed ? 'confirmed' : 'preview'} tone-${group.tone ?? index % 4}" data-cards="${group.cardIds.join(',')}" style="left:${x}px;top:${y}px;width:${right - x}px;height:${bottom - y}px"><span>${escape(label)}</span></div>`;
+    const width = right - x, height = bottom - y;
+    return `<div aria-hidden="true" class="group-outline ${confirmed ? 'confirmed' : 'preview'} tone-${group.tone ?? index % 4}" data-cards="${group.cardIds.join(',')}" style="left:${x}px;top:${y}px;width:${width}px;height:${height}px"><svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path fill-rule="evenodd" d="${roundedContour(positions, x, y)}"/></svg><span style="left:${anchor.x - x + 4}px;top:${anchor.y - y - 21}px">${escape(label)}</span></div>`;
   }).join('');
   if (markup !== outlineMarkup) { outlines.innerHTML = markup; outlineMarkup = markup; }
+}
+
+function roundedContour(positions, originX, originY) {
+  // Trace the union of padded card rectangles, retaining concave gaps and holes.
+  // Coordinate compression keeps the work bounded by card count, not world size.
+  const rectangles = positions.map(p => ({ left: p.x - 16, right: p.x + CARD_W + 16, top: p.y - 24, bottom: p.y + CARD_H + 16 }));
+  const xs = [...new Set(rectangles.flatMap(r => [r.left, r.right]))].sort((a, b) => a - b);
+  const ys = [...new Set(rectangles.flatMap(r => [r.top, r.bottom]))].sort((a, b) => a - b);
+  const xi = new Map(xs.map((x, i) => [x, i])), yi = new Map(ys.map((y, i) => [y, i]));
+  const cols = xs.length - 1, rows = ys.length - 1;
+  const cells = new Uint8Array(cols * rows);
+  for (const r of rectangles) for (let j = yi.get(r.top); j < yi.get(r.bottom); j++) {
+    for (let i = xi.get(r.left); i < xi.get(r.right); i++) cells[j * cols + i] = 1;
+  }
+  const occupied = (i, j) => i >= 0 && j >= 0 && i < cols && j < rows && cells[j * cols + i];
+  const edges = [], starts = new Map();
+  function edge(ax, ay, bx, by, direction) {
+    const value = { ax, ay, bx, by, direction, used: false };
+    edges.push(value);
+    const key = `${ax},${ay}`;
+    if (!starts.has(key)) starts.set(key, []);
+    starts.get(key).push(value);
+  }
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) if (occupied(i, j)) {
+    if (!occupied(i, j - 1)) edge(i, j, i + 1, j, 0);
+    if (!occupied(i + 1, j)) edge(i + 1, j, i + 1, j + 1, 1);
+    if (!occupied(i, j + 1)) edge(i + 1, j + 1, i, j + 1, 2);
+    if (!occupied(i - 1, j)) edge(i, j + 1, i, j, 3);
+  }
+  const loops = [];
+  for (const first of edges) {
+    if (first.used) continue;
+    const points = [];
+    let current = first;
+    while (current && !current.used) {
+      current.used = true;
+      points.push({ x: xs[current.ax] - originX, y: ys[current.ay] - originY });
+      if (current.bx === first.ax && current.by === first.ay) break;
+      const next = (starts.get(`${current.bx},${current.by}`) || []).filter(e => !e.used);
+      const priority = e => [1, 0, 3, 2][(e.direction - current.direction + 4) % 4];
+      current = next.sort((a, b) => priority(a) - priority(b))[0];
+    }
+    const corners = points.filter((p, i) => {
+      const prev = points[(i + points.length - 1) % points.length], next = points[(i + 1) % points.length];
+      return (p.x - prev.x) * (next.y - p.y) !== (p.y - prev.y) * (next.x - p.x);
+    });
+    if (corners.length >= 3) loops.push(corners);
+  }
+  const n = value => Math.round(value * 100) / 100;
+  return loops.map(points => {
+    const curves = points.map((p, i) => {
+      const prev = points[(i + points.length - 1) % points.length], next = points[(i + 1) % points.length];
+      const incoming = Math.hypot(p.x - prev.x, p.y - prev.y), outgoing = Math.hypot(next.x - p.x, next.y - p.y);
+      const radius = Math.min(18, incoming / 2, outgoing / 2);
+      return { p, start: { x: p.x + (prev.x - p.x) / incoming * radius, y: p.y + (prev.y - p.y) / incoming * radius }, end: { x: p.x + (next.x - p.x) / outgoing * radius, y: p.y + (next.y - p.y) / outgoing * radius } };
+    });
+    return curves.map((c, i) => `${i ? 'L' : 'M'}${n(c.start.x)},${n(c.start.y)} Q${n(c.p.x)},${n(c.p.y)} ${n(c.end.x)},${n(c.end.y)}`).join(' ') + ' Z';
+  }).join(' ');
 }
 
 function zoomAt(x, y, scale) {
