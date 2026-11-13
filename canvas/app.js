@@ -2,6 +2,8 @@ import { cardNames } from '../test/cards.js';
 
 const CARD_W = 144, CARD_H = 70, GAP = 24;
 const CARD_CLEARANCE = 8;
+// Whole groups stay farther apart than both proximity links and outline padding.
+const GROUP_CLEARANCE = 44;
 const catalog = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name }));
 const viewport = document.querySelector('#viewport');
 const world = document.querySelector('#world');
@@ -103,7 +105,7 @@ function paint() {
 
 function drawOutlines() {
   const confirmed = state.confirmed && state.review && !(gesture?.type === 'card' && gesture.moved);
-  let groups = confirmed ? state.review.groups : spatialClusters().filter(ids => ids.length > 1).map(cardIds => ({ cardIds }));
+  let groups = confirmed ? state.review.groups : spatialClusters(gesture?.type === 'group' ? gesture.ids : []).filter(ids => ids.length > 1).map(cardIds => ({ cardIds }));
   if (gesture?.type === 'group') {
     groups = groups.map(group => ({ ...group, cardIds: group.cardIds.filter(id => !gesture.ids.includes(id)) })).filter(group => group.cardIds.length > 1);
     groups.push({ cardIds: gesture.ids, name: gesture.groupName, held: true });
@@ -226,6 +228,7 @@ function updateCard(point) {
     const dx = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x - gesture.original.x, -10000 - Math.min(...originals.map(p => p.x)), 10000 - Math.max(...originals.map(p => p.x)));
     const dy = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y - gesture.original.y, -10000 - Math.min(...originals.map(p => p.y)), 10000 - Math.max(...originals.map(p => p.y)));
     for (const id of gesture.ids) { state.positions[id].x = gesture.snapshot[id].x + dx; state.positions[id].y = gesture.snapshot[id].y + dy; }
+    settleGroup(gesture.ids, false);
     return;
   }
   const p = state.positions[gesture.id];
@@ -260,10 +263,10 @@ function settleCard(id) {
   Object.assign(position, nearest);
   return true;
 }
-function settleGroup(ids) {
+function settleGroup(ids, showNotice = true) {
   const members = ids.map(id => state.positions[id]);
   const others = catalog.filter(card => !ids.includes(card.id)).map(card => state.positions[card.id]);
-  const free = (dx, dy) => members.every(p => others.every(other => !overlaps({ x: p.x + dx, y: p.y + dy }, other, CARD_CLEARANCE)));
+  const free = (dx, dy) => members.every(p => others.every(other => !overlaps({ x: p.x + dx, y: p.y + dy }, other, GROUP_CLEARANCE)));
   if (free(0, 0)) return false;
   const candidates = [];
   // Resolve external overlaps by translating the whole group along one axis.
@@ -272,8 +275,8 @@ function settleGroup(ids) {
     const intervals = [];
     const size = axis === 'x' ? CARD_W : CARD_H;
     for (const p of members) for (const other of others) {
-      const aligned = axis === 'x' ? Math.abs((p.y + CARD_H / 2) - (other.y + CARD_H / 2)) < CARD_H + CARD_CLEARANCE - .001 : Math.abs((p.x + CARD_W / 2) - (other.x + CARD_W / 2)) < CARD_W + CARD_CLEARANCE - .001;
-      if (aligned) intervals.push([other[axis] - p[axis] - size - CARD_CLEARANCE, other[axis] - p[axis] + size + CARD_CLEARANCE]);
+      const aligned = axis === 'x' ? Math.abs((p.y + CARD_H / 2) - (other.y + CARD_H / 2)) < CARD_H + GROUP_CLEARANCE - .001 : Math.abs((p.x + CARD_W / 2) - (other.x + CARD_W / 2)) < CARD_W + GROUP_CLEARANCE - .001;
+      if (aligned) intervals.push([other[axis] - p[axis] - size - GROUP_CLEARANCE, other[axis] - p[axis] + size + GROUP_CLEARANCE]);
     }
     intervals.sort((a, b) => a[0] - b[0]);
     const merged = [];
@@ -290,7 +293,7 @@ function settleGroup(ids) {
     }
   }
   const best = candidates.sort((a, b) => Math.hypot(a.dx, a.dy) - Math.hypot(b.dx, b.dy))[0];
-  if (!best) { restoreDrag(); notify('이 위치에는 묶음을 놓을 공간이 부족하다.'); return false; }
+  if (!best) { restoreDrag(); if (showNotice) notify('이 위치에는 묶음을 놓을 공간이 부족하다.'); return false; }
   for (const p of members) { p.x += best.dx; p.y += best.dy; }
   return true;
 }
@@ -431,17 +434,19 @@ viewport.addEventListener('focusin', event => {
   if (rect.left < 8 || rect.top < 8 || rect.right > innerWidth - 8 || rect.bottom > innerHeight - 75) focusCard(id);
 });
 
-function spatialClusters() {
-  const parents = catalog.map((_, i) => i);
+function spatialClusters(excludedIds = []) {
+  const excluded = new Set(excludedIds);
+  const active = catalog.filter(card => !excluded.has(card.id));
+  const parents = active.map((_, i) => i);
   function find(i) { while (parents[i] !== i) { parents[i] = parents[parents[i]]; i = parents[i]; } return i; }
-  for (let i = 0; i < catalog.length; i++) for (let j = i + 1; j < catalog.length; j++) {
-    const a = state.positions[catalog[i].id], b = state.positions[catalog[j].id];
+  for (let i = 0; i < active.length; i++) for (let j = i + 1; j < active.length; j++) {
+    const a = state.positions[active[i].id], b = state.positions[active[j].id];
     const dx = Math.max(0, a.x - b.x - CARD_W, b.x - a.x - CARD_W);
     const dy = Math.max(0, a.y - b.y - CARD_H, b.y - a.y - CARD_H);
     if (Math.hypot(dx, dy) <= GAP) parents[find(i)] = find(j);
   }
   const clusters = new Map();
-  catalog.forEach((card, i) => { const root = find(i); if (!clusters.has(root)) clusters.set(root, []); clusters.get(root).push(card.id); });
+  active.forEach((card, i) => { const root = find(i); if (!clusters.has(root)) clusters.set(root, []); clusters.get(root).push(card.id); });
   return [...clusters.values()];
 }
 function inferGroups() {
