@@ -1,6 +1,7 @@
 import { cardNames } from '../test/cards.js';
 
 const CARD_W = 144, CARD_H = 70, GAP = 24;
+const CARD_CLEARANCE = 8;
 const catalog = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name }));
 const viewport = document.querySelector('#viewport');
 const world = document.querySelector('#world');
@@ -112,6 +113,39 @@ function updateCard(point) {
   p.x = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x, -10000, 10000);
   p.y = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y, -10000, 10000);
 }
+function overlaps(a, b, clearance = 0) {
+  return a.x < b.x + CARD_W + clearance - 0.001 && a.x + CARD_W + clearance > b.x + 0.001
+    && a.y < b.y + CARD_H + clearance - 0.001 && a.y + CARD_H + clearance > b.y + 0.001;
+}
+function settleCard(id) {
+  const position = state.positions[id];
+  const others = catalog.filter(card => card.id !== id).map(card => state.positions[card.id]);
+  const free = candidate => others.every(other => !overlaps(candidate, other, CARD_CLEARANCE));
+  if (free(position)) return false;
+  // Move only the released card. Eight-unit spacing still belongs to the same
+  // proximity cluster, and the other cards keep the participant's arrangement.
+  const xs = new Set([position.x, -10000, 10000]);
+  const ys = new Set([position.y, -10000, 10000]);
+  for (const other of others) {
+    xs.add(clamp(other.x - CARD_W - CARD_CLEARANCE, -10000, 10000));
+    xs.add(clamp(other.x + CARD_W + CARD_CLEARANCE, -10000, 10000));
+    ys.add(clamp(other.y - CARD_H - CARD_CLEARANCE, -10000, 10000));
+    ys.add(clamp(other.y + CARD_H + CARD_CLEARANCE, -10000, 10000));
+  }
+  let nearest = null, distance = Infinity;
+  for (const x of xs) for (const y of ys) {
+    const d = (x - position.x) ** 2 + (y - position.y) ** 2;
+    if (d < distance && free({ x, y })) { nearest = { x, y }; distance = d; }
+  }
+  if (!nearest) return false;
+  Object.assign(position, nearest);
+  return true;
+}
+function animateSettling(id) {
+  const element = cardsElement.querySelector(`[data-id="${id}"]`);
+  element.classList.add('settling');
+  setTimeout(() => element.classList.remove('settling'), 200);
+}
 function edgePan() {
   if (gesture?.type !== 'card' || !gesture.moved) return;
   const point = pointers.values().next().value;
@@ -144,6 +178,7 @@ viewport.addEventListener('pointerdown', event => {
   const id = event.target.closest('.card')?.dataset.id;
   const start = { x: event.clientX, y: event.clientY };
   if (id) {
+    cardsElement.querySelector(`[data-id="${id}"]`).classList.remove('settling');
     const original = { ...state.positions[id] };
     selectedId = id;
     gesture = { type: 'card', id, start, original, snapshot: copy(state.positions), moved: false, offset: { x: (start.x - state.view.x) / state.view.scale - original.x, y: (start.y - state.view.y) / state.view.scale - original.y } };
@@ -187,7 +222,10 @@ function finishPointer(event, cancelled = false) {
     stopAnimation();
     if (gesture?.type === 'card') {
       if (cancelled) state.positions[gesture.id] = gesture.original;
-      else if (gesture.moved) { remember(gesture.snapshot); invalidate(); }
+      else if (gesture.moved) {
+        if (settleCard(gesture.id)) animateSettling(gesture.id);
+        remember(gesture.snapshot); invalidate();
+      }
       else {
         if (lastTap?.id === gesture.id && Date.now() - lastTap.time < 330) focusCard(gesture.id);
         lastTap = { id: gesture.id, time: Date.now() };
@@ -216,6 +254,7 @@ viewport.addEventListener('keydown', event => {
   const [dx, dy] = directions[event.key];
   state.positions[id].x += dx * (event.shiftKey ? 40 : 12);
   state.positions[id].y += dy * (event.shiftKey ? 40 : 12);
+  settleCard(id);
   invalidate(); paint(); save(); announce(`${cardName(id)} 위치 이동`);
 });
 viewport.addEventListener('focusin', event => {
