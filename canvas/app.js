@@ -479,12 +479,24 @@ function showReview() {
   if (!state.review) state.review = inferGroups();
   renderReview(); reviewDialog.showModal(); save();
 }
+function resetTest() {
+  cancelHold(); stopAnimation(); clearTimeout(toastTimer);
+  pointers.clear(); gesture = null; history = []; selectedId = null; lastTap = null; previewGroups = [];
+  if (reviewDialog.open) reviewDialog.close();
+  reviewDialog.innerHTML = '';
+  document.querySelector('#toast').classList.remove('visible');
+  try { localStorage.removeItem(storageKey); } catch {}
+  state = initial();
+  renderCards(); save();
+  announce('저장된 배치와 분류를 지우고 다시 시작했다.');
+}
 
 document.addEventListener('click', event => {
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled) return;
   const action = button.dataset.action;
-  if (action === 'zoom-in' || action === 'zoom-out') { zoomAt(innerWidth / 2, (innerHeight - 70) / 2, state.view.scale * (action === 'zoom-in' ? 1.25 : 0.8)); save(); }
+  if (action === 'reset-test') resetTest();
+  else if (action === 'zoom-in' || action === 'zoom-out') { zoomAt(innerWidth / 2, (innerHeight - 70) / 2, state.view.scale * (action === 'zoom-in' ? 1.25 : 0.8)); save(); }
   else if (action === 'fit') fitAll();
   else if (action === 'undo' && history.length) {
     const previous = history.pop();

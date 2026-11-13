@@ -18,3 +18,5 @@
 .card,#viewport{-webkit-touch-callout:none}.card.group-held{border-color:#2983ad;box-shadow:0 0 0 2px #62aad23d,0 5px 16px #234c6919}.group-outline.group-held path{stroke:#348daf;stroke-width:2.5;stroke-dasharray:none;fill:rgb(87 164 205 / 20%)}.group-outline.group-held>span{color:#286e91;font-weight:700}
 
 .card.pushed{border-color:#92b3c7;box-shadow:0 4px 14px #365c7317}
+
+.reset-test{position:fixed;right:12px;bottom:calc(17px + env(safe-area-inset-bottom));z-index:45;min-height:32px;padding:6px 10px;border:1px solid #d4e0e9;border-radius:7px;background:#f8fafcee;color:#7890a2;font-size:10px;line-height:1.6}.reset-test:hover{background:#fff;color:#426983;border-color:#aec6d6}@media(max-width:700px){.reset-test{right:10px;bottom:calc(88px + env(safe-area-inset-bottom));min-height:36px;padding:7px 10px}}
