@@ -16,15 +16,30 @@ const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const cardName = id => catalog.find(card => card.id === id)?.name || '';
 const copy = value => JSON.parse(JSON.stringify(value));
-function initial() {
-  const cols = innerWidth <= 700 ? 2 : 5;
-  const order = [...catalog];
-  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+function overviewView(positions) {
+  const points = Object.values(positions);
+  const left = Math.min(...points.map(p => p.x)), top = Math.min(...points.map(p => p.y));
+  const width = Math.max(...points.map(p => p.x + CARD_W)) - left;
+  const height = Math.max(...points.map(p => p.y + CARD_H)) - top;
+  const availableHeight = Math.max(1, innerHeight - 84);
+  const scale = clamp(Math.min((innerWidth - 32) / width, (availableHeight - 32) / height), 0.01, 1.5);
+  return { scale, x: (innerWidth - width * scale) / 2 - left * scale, y: (availableHeight - height * scale) / 2 - top * scale };
+}
+function initial(existingOrder) {
+  const cols = 5, rows = Math.ceil(catalog.length / cols);
+  const stepX = CARD_W + 48;
+  const side = (cols - 1) * stepX + CARD_W;
+  const stepY = rows > 1 ? (side - CARD_H) / (rows - 1) : 0;
+  const order = existingOrder || [...catalog];
+  if (!existingOrder) for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
   const positions = {};
-  order.forEach((card, index) => { positions[card.id] = { x: (index % cols) * 184, y: Math.floor(index / cols) * 112, z: index + 1 }; });
-  const width = cols * CARD_W + (cols - 1) * 40;
-  const scale = Math.min(1, (innerWidth - 24) / width);
-  return { positions, view: { x: Math.max(12, (innerWidth - width * scale) / 2), y: 20, scale }, review: null, confirmed: false };
+  order.forEach((card, index) => { positions[card.id] = { x: (index % cols) * stepX, y: Math.floor(index / cols) * stepY, z: index + 1 }; });
+  return { positions, view: overviewView(positions), review: null, confirmed: false, layoutVersion: 'square-v1' };
+}
+function isUntouchedOldGrid(value) {
+  if (value.layoutVersion || value.review || value.confirmed) return false;
+  const points = Object.values(value.positions).sort((a, b) => a.y - b.y || a.x - b.x);
+  return [2, 5].some(cols => points.every((p, i) => Math.abs(p.x - (i % cols) * 184) < .01 && Math.abs(p.y - Math.floor(i / cols) * 112) < .01));
 }
 function valid(value) {
   return value && catalog.every(card => {
@@ -34,7 +49,12 @@ function valid(value) {
 }
 let state;
 try { const value = JSON.parse(localStorage.getItem(storageKey) || 'null'); if (valid(value)) state = value; } catch {}
+if (state && isUntouchedOldGrid(state)) {
+  const order = [...catalog].sort((a, b) => state.positions[a.id].y - state.positions[b.id].y || state.positions[a.id].x - state.positions[b.id].x);
+  state = initial(order);
+}
 state ||= initial();
+state.view = overviewView(state.positions);
 const pointers = new Map();
 let gesture = null;
 let animation = null;
@@ -208,13 +228,7 @@ function zoomAt(x, y, scale) {
   paint();
 }
 function fitAll() {
-  const positions = Object.values(state.positions);
-  const left = Math.min(...positions.map(p => p.x));
-  const top = Math.min(...positions.map(p => p.y));
-  const width = Math.max(...positions.map(p => p.x + CARD_W)) - left;
-  const height = Math.max(...positions.map(p => p.y + CARD_H)) - top;
-  const scale = clamp(Math.min((innerWidth - 32) / width, (innerHeight - 106) / height), 0.01, 1.5);
-  state.view = { scale, x: (innerWidth - width * scale) / 2 - left * scale, y: 20 - top * scale };
+  state.view = overviewView(state.positions);
   paint(); save();
 }
 function focusCard(id) {
