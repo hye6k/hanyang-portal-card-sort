@@ -107,6 +107,9 @@ function renderCards() {
 }
 function paint() {
   world.style.transform = `translate3d(${state.view.x}px,${state.view.y}px,0) scale(${state.view.scale})`;
+  world.style.setProperty('--group-stroke', `${2 / state.view.scale}px`);
+  world.style.setProperty('--confirmed-stroke', `${2.5 / state.view.scale}px`);
+  world.style.setProperty('--held-stroke', `${3.2 / state.view.scale}px`);
   const spacing = Math.max(6, 24 * state.view.scale);
   viewport.style.backgroundSize = `${spacing}px ${spacing}px`;
   viewport.style.backgroundPosition = `${state.view.x}px ${state.view.y}px`;
