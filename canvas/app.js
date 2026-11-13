@@ -60,7 +60,7 @@ function armGroupHold() {
     lastTap = null;
     notify(`${ids.length}개 묶음을 함께 이동한다.`);
     paint();
-  }, 1000);
+  }, 500);
 }
 
 function save() { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {} }
