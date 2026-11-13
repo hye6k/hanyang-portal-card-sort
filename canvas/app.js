@@ -48,8 +48,7 @@ let holdTimer;
 const isCardGesture = () => gesture?.type === 'card' || gesture?.type === 'group';
 function cancelHold() { clearTimeout(holdTimer); holdTimer = null; }
 function restoreDrag() {
-  if (gesture?.type === 'group') for (const id of gesture.ids) state.positions[id] = { ...gesture.snapshot[id] };
-  else if (gesture?.type === 'card') state.positions[gesture.id] = { ...gesture.original };
+  if (isCardGesture()) state.positions = copy(gesture.snapshot);
 }
 function armGroupHold() {
   const pending = gesture;
@@ -59,6 +58,7 @@ function armGroupHold() {
     const ids = confirmedGroup?.cardIds || spatialClusters().find(ids => ids.includes(pending.id));
     if (!ids || ids.length < 2) return;
     pending.type = 'group'; pending.ids = [...ids]; pending.groupName = confirmedGroup?.name;
+    pending.others = movementGroups(ids);
     lastTap = null;
     notify(`${ids.length}개 묶음을 함께 이동한다.`);
     paint();
@@ -98,6 +98,7 @@ function paint() {
     const inGroup = gesture?.type === 'group' && gesture.ids.includes(card.id);
     el.classList.toggle('moving', isCardGesture() && gesture.moved && (gesture.id === card.id || inGroup));
     el.classList.toggle('group-held', inGroup);
+    el.classList.toggle('pushed', isCardGesture() && gesture.pushed?.has(card.id));
   }
   drawOutlines();
   updateControls();
@@ -107,7 +108,7 @@ function drawOutlines() {
   const confirmed = state.confirmed && state.review && !(gesture?.type === 'card' && gesture.moved);
   let groups = confirmed ? state.review.groups : spatialClusters(gesture?.type === 'group' ? gesture.ids : []).filter(ids => ids.length > 1).map(cardIds => ({ cardIds }));
   if (gesture?.type === 'group') {
-    groups = groups.map(group => ({ ...group, cardIds: group.cardIds.filter(id => !gesture.ids.includes(id)) })).filter(group => group.cardIds.length > 1);
+    groups = gesture.others.filter(group => group.cardIds.length > 1).map(group => ({ ...group }));
     groups.push({ cardIds: gesture.ids, name: gesture.groupName, held: true });
   }
   if (!confirmed) {
@@ -228,55 +229,37 @@ function updateCard(point) {
     const dx = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x - gesture.original.x, -10000 - Math.min(...originals.map(p => p.x)), 10000 - Math.max(...originals.map(p => p.x)));
     const dy = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y - gesture.original.y, -10000 - Math.min(...originals.map(p => p.y)), 10000 - Math.max(...originals.map(p => p.y)));
     for (const id of gesture.ids) { state.positions[id].x = gesture.snapshot[id].x + dx; state.positions[id].y = gesture.snapshot[id].y + dy; }
-    settleGroup(gesture.ids, false);
+    pushNeighbours();
     return;
   }
   const p = state.positions[gesture.id];
   p.x = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x, -10000, 10000);
   p.y = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y, -10000, 10000);
+  pushNeighbours();
 }
 function overlaps(a, b, clearance = 0) {
   return a.x < b.x + CARD_W + clearance - 0.001 && a.x + CARD_W + clearance > b.x + 0.001
     && a.y < b.y + CARD_H + clearance - 0.001 && a.y + CARD_H + clearance > b.y + 0.001;
 }
-function settleCard(id) {
-  const position = state.positions[id];
-  const others = catalog.filter(card => card.id !== id).map(card => state.positions[card.id]);
-  const free = candidate => others.every(other => !overlaps(candidate, other, CARD_CLEARANCE));
-  if (free(position)) return false;
-  // Move only the released card. Eight-unit spacing still belongs to the same
-  // proximity cluster, and the other cards keep the participant's arrangement.
-  const xs = new Set([position.x, -10000, 10000]);
-  const ys = new Set([position.y, -10000, 10000]);
-  for (const other of others) {
-    xs.add(clamp(other.x - CARD_W - CARD_CLEARANCE, -10000, 10000));
-    xs.add(clamp(other.x + CARD_W + CARD_CLEARANCE, -10000, 10000));
-    ys.add(clamp(other.y - CARD_H - CARD_CLEARANCE, -10000, 10000));
-    ys.add(clamp(other.y + CARD_H + CARD_CLEARANCE, -10000, 10000));
-  }
-  let nearest = null, distance = Infinity;
-  for (const x of xs) for (const y of ys) {
-    const d = (x - position.x) ** 2 + (y - position.y) ** 2;
-    if (d < distance && free({ x, y })) { nearest = { x, y }; distance = d; }
-  }
-  if (!nearest) return false;
-  Object.assign(position, nearest);
-  return true;
+function movementGroups(activeIds) {
+  if (!state.confirmed || !state.review) return spatialClusters(activeIds).map(cardIds => ({ cardIds }));
+  const excluded = new Set(activeIds);
+  const groups = state.review.groups.map(group => ({ name: group.name, cardIds: group.cardIds.filter(id => !excluded.has(id)) })).filter(group => group.cardIds.length);
+  const assigned = new Set([...activeIds, ...groups.flatMap(group => group.cardIds)]);
+  for (const card of catalog) if (!assigned.has(card.id)) groups.push({ cardIds: [card.id] });
+  return groups;
 }
-function settleGroup(ids, showNotice = true) {
+function pushOffset(ids, blockers) {
   const members = ids.map(id => state.positions[id]);
-  const others = catalog.filter(card => !ids.includes(card.id)).map(card => state.positions[card.id]);
-  const free = (dx, dy) => members.every(p => others.every(other => !overlaps({ x: p.x + dx, y: p.y + dy }, other, GROUP_CLEARANCE)));
-  if (free(0, 0)) return false;
+  const pairs = blockers.flatMap(blocker => blocker.cardIds.map(id => ({ position: state.positions[id], clearance: blocker.active && gesture.type === 'card' ? CARD_CLEARANCE : GROUP_CLEARANCE })));
+  const free = (dx, dy) => members.every(p => pairs.every(({ position, clearance }) => !overlaps({ x: p.x + dx, y: p.y + dy }, position, clearance)));
+  if (free(0, 0)) return { dx: 0, dy: 0 };
   const candidates = [];
-  // Resolve external overlaps by translating the whole group along one axis.
-  // Merging forbidden intervals avoids an expensive search over all card pairs.
   for (const axis of ['x', 'y']) {
-    const intervals = [];
-    const size = axis === 'x' ? CARD_W : CARD_H;
-    for (const p of members) for (const other of others) {
-      const aligned = axis === 'x' ? Math.abs((p.y + CARD_H / 2) - (other.y + CARD_H / 2)) < CARD_H + GROUP_CLEARANCE - .001 : Math.abs((p.x + CARD_W / 2) - (other.x + CARD_W / 2)) < CARD_W + GROUP_CLEARANCE - .001;
-      if (aligned) intervals.push([other[axis] - p[axis] - size - GROUP_CLEARANCE, other[axis] - p[axis] + size + GROUP_CLEARANCE]);
+    const intervals = [], size = axis === 'x' ? CARD_W : CARD_H;
+    for (const p of members) for (const { position: other, clearance } of pairs) {
+      const aligned = axis === 'x' ? Math.abs(p.y - other.y) < CARD_H + clearance - .001 : Math.abs(p.x - other.x) < CARD_W + clearance - .001;
+      if (aligned) intervals.push([other[axis] - p[axis] - size - clearance, other[axis] - p[axis] + size + clearance]);
     }
     intervals.sort((a, b) => a[0] - b[0]);
     const merged = [];
@@ -288,19 +271,32 @@ function settleGroup(ids, showNotice = true) {
     for (const [left, right] of merged) if (left < 0 && right > 0) {
       for (const shift of [left, right]) {
         const dx = axis === 'x' ? shift : 0, dy = axis === 'y' ? shift : 0;
-        if (members.every(p => p.x + dx >= -10000 && p.x + dx <= 10000 && p.y + dy >= -10000 && p.y + dy <= 10000) && free(dx, dy)) candidates.push({ dx, dy });
+        if (free(dx, dy)) candidates.push({ dx, dy });
       }
     }
   }
-  const best = candidates.sort((a, b) => Math.hypot(a.dx, a.dy) - Math.hypot(b.dx, b.dy))[0];
-  if (!best) { restoreDrag(); if (showNotice) notify('이 위치에는 묶음을 놓을 공간이 부족하다.'); return false; }
-  for (const p of members) { p.x += best.dx; p.y += best.dy; }
-  return true;
+  return candidates.sort((a, b) => Math.hypot(a.dx, a.dy) - Math.hypot(b.dx, b.dy))[0];
 }
-function animateSettling(id) {
-  const element = cardsElement.querySelector(`[data-id="${id}"]`);
-  element.classList.add('settling');
-  setTimeout(() => element.classList.remove('settling'), 200);
+function pushNeighbours() {
+  const activeIds = gesture.type === 'group' ? gesture.ids : [gesture.id];
+  const placed = [{ cardIds: activeIds, active: true }];
+  const remaining = [...gesture.others];
+  // Each encountered group becomes a fixed obstacle for the next one. The held
+  // object follows the pointer; contact propagates outward without bouncing back.
+  while (remaining.length) {
+    const index = remaining.findIndex(group => group.cardIds.some(id => placed.some(blocker => {
+      const clearance = blocker.active && gesture.type === 'card' ? CARD_CLEARANCE : GROUP_CLEARANCE;
+      return blocker.cardIds.some(other => overlaps(state.positions[id], state.positions[other], clearance));
+    })));
+    if (index < 0) break;
+    const group = remaining.splice(index, 1)[0];
+    const offset = pushOffset(group.cardIds, placed);
+    if (offset) for (const id of group.cardIds) {
+      state.positions[id].x += offset.dx; state.positions[id].y += offset.dy;
+      gesture.pushed.add(id);
+    }
+    placed.push(group);
+  }
 }
 function edgePan() {
   if (!isCardGesture() || !gesture.moved) return;
@@ -338,7 +334,7 @@ viewport.addEventListener('pointerdown', event => {
     cardsElement.querySelector(`[data-id="${id}"]`).classList.remove('settling');
     const original = { ...state.positions[id] };
     selectedId = id;
-    gesture = { type: 'card', id, start, original, snapshot: copy(state.positions), moved: false, offset: { x: (start.x - state.view.x) / state.view.scale - original.x, y: (start.y - state.view.y) / state.view.scale - original.y } };
+    gesture = { type: 'card', id, start, original, snapshot: copy(state.positions), others: movementGroups([id]), pushed: new Set(), moved: false, offset: { x: (start.x - state.view.x) / state.view.scale - original.x, y: (start.y - state.view.y) / state.view.scale - original.y } };
     armGroupHold();
   } else { selectedId = null; gesture = { type: 'pan', start, view: { ...state.view } }; }
   paint();
@@ -385,14 +381,9 @@ function finishPointer(event, cancelled = false) {
     if (isCardGesture()) {
       if (cancelled) restoreDrag();
       else if (gesture.moved) {
-        if (gesture.type === 'group') {
-          if (settleGroup(gesture.ids)) gesture.ids.forEach(animateSettling);
-          remember(gesture.snapshot, true);
-          if (!state.confirmed) invalidate();
-        } else {
-          if (settleCard(gesture.id)) animateSettling(gesture.id);
-          remember(gesture.snapshot); invalidate();
-        }
+        pushNeighbours();
+        remember(gesture.snapshot, gesture.type === 'group');
+        if (gesture.type !== 'group' || !state.confirmed) invalidate();
       }
       else if (gesture.type === 'card') {
         if (lastTap?.id === gesture.id && Date.now() - lastTap.time < 330) focusCard(gesture.id);
@@ -418,12 +409,15 @@ viewport.addEventListener('wheel', event => {
 viewport.addEventListener('keydown', event => {
   const id = event.target.closest('.card')?.dataset.id;
   const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-  if (!id || !directions[event.key]) return;
-  event.preventDefault(); remember(copy(state.positions));
+  if (!id || !directions[event.key] || gesture) return;
+  event.preventDefault();
+  const snapshot = copy(state.positions);
+  remember(snapshot);
+  gesture = { type: 'card', id, snapshot, others: movementGroups([id]), pushed: new Set() };
   const [dx, dy] = directions[event.key];
   state.positions[id].x += dx * (event.shiftKey ? 40 : 12);
   state.positions[id].y += dy * (event.shiftKey ? 40 : 12);
-  settleCard(id);
+  pushNeighbours(); gesture = null;
   invalidate(); paint(); save(); announce(`${cardName(id)} 위치 이동`);
 });
 viewport.addEventListener('focusin', event => {
