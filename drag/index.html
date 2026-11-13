@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#182e45">
+  <meta name="robots" content="noindex,nofollow">
+  <title>끌어서 카드 묶기 · UI 테스트</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <a href="#main" class="skip">카드 분류로 이동</a>
+  <div id="app"></div>
+  <div id="drag-ghost" class="drag-ghost" aria-hidden="true"></div>
+  <div id="drag-hint" class="drag-hint" aria-hidden="true"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <dialog id="confirmation" aria-labelledby="confirmation-title"></dialog>
+  <noscript>카드를 묶으려면 브라우저에서 JavaScript를 사용할 수 있어야 한다.</noscript>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
