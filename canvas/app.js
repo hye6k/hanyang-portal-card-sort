@@ -2,6 +2,7 @@ import { cardNames } from '../test/cards.js';
 
 const CARD_W = 144, CARD_H = 70, GAP = 24;
 const CARD_CLEARANCE = 8;
+const COLLISION_RADIUS = 16;
 // Whole groups stay farther apart than both proximity links and outline padding.
 const GROUP_CLEARANCE = 44;
 const catalog = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name }));
@@ -252,10 +253,21 @@ function updateCard(point) {
   p.y = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y, -10000, 10000);
   pushNeighbours();
 }
-function overlaps(a, b, clearance = 0) {
-  return a.x < b.x + CARD_W + clearance - 0.001 && a.x + CARD_W + clearance > b.x + 0.001
-    && a.y < b.y + CARD_H + clearance - 0.001 && a.y + CARD_H + clearance > b.y + 0.001;
+function collisionContact(a, b, clearance) {
+  // Minkowski sum of two rounded cards plus the requested separation.
+  const dx = a.x - b.x, dy = a.y - b.y;
+  const qx = Math.abs(dx) - (CARD_W - 2 * COLLISION_RADIUS);
+  const qy = Math.abs(dy) - (CARD_H - 2 * COLLISION_RADIUS);
+  const radius = 2 * COLLISION_RADIUS + clearance;
+  const outsideX = Math.max(qx, 0), outsideY = Math.max(qy, 0);
+  const length = Math.hypot(outsideX, outsideY);
+  const distance = length + Math.min(Math.max(qx, qy), 0) - radius;
+  if (distance >= -.001) return null;
+  const sx = dx < 0 ? -1 : 1, sy = dy < 0 ? -1 : 1;
+  if (length > .0001) return { depth: -distance, nx: sx * outsideX / length, ny: sy * outsideY / length };
+  return qx > qy ? { depth: -distance, nx: sx, ny: 0 } : { depth: -distance, nx: 0, ny: sy };
 }
+function overlaps(a, b, clearance = 0) { return collisionContact(a, b, clearance) !== null; }
 function movementGroups(activeIds) {
   if (!state.confirmed || !state.review) return spatialClusters(activeIds).map(cardIds => ({ cardIds }));
   const excluded = new Set(activeIds);
@@ -267,30 +279,38 @@ function movementGroups(activeIds) {
 function pushOffset(ids, blockers) {
   const members = ids.map(id => state.positions[id]);
   const pairs = blockers.flatMap(blocker => blocker.cardIds.map(id => ({ position: state.positions[id], clearance: blocker.active && gesture.type === 'card' ? CARD_CLEARANCE : GROUP_CLEARANCE })));
-  const free = (dx, dy) => members.every(p => pairs.every(({ position, clearance }) => !overlaps({ x: p.x + dx, y: p.y + dy }, position, clearance)));
-  if (free(0, 0)) return { dx: 0, dy: 0 };
-  const candidates = [];
-  for (const axis of ['x', 'y']) {
-    const intervals = [], size = axis === 'x' ? CARD_W : CARD_H;
-    for (const p of members) for (const { position: other, clearance } of pairs) {
-      const aligned = axis === 'x' ? Math.abs(p.y - other.y) < CARD_H + clearance - .001 : Math.abs(p.x - other.x) < CARD_W + clearance - .001;
-      if (aligned) intervals.push([other[axis] - p[axis] - size - clearance, other[axis] - p[axis] + size + clearance]);
+  function deepest(dx, dy) {
+    let contact = null;
+    for (const p of members) for (const pair of pairs) {
+      const candidate = collisionContact({ x: p.x + dx, y: p.y + dy }, pair.position, pair.clearance);
+      if (candidate && (!contact || candidate.depth > contact.depth)) contact = candidate;
     }
-    intervals.sort((a, b) => a[0] - b[0]);
-    const merged = [];
-    for (const interval of intervals) {
-      const last = merged[merged.length - 1];
-      if (last && interval[0] < last[1]) last[1] = Math.max(last[1], interval[1]);
-      else merged.push([...interval]);
-    }
-    for (const [left, right] of merged) if (left < 0 && right > 0) {
-      for (const shift of [left, right]) {
-        const dx = axis === 'x' ? shift : 0, dy = axis === 'y' ? shift : 0;
-        if (free(dx, dy)) candidates.push({ dx, dy });
-      }
-    }
+    return contact;
   }
-  return candidates.sort((a, b) => Math.hypot(a.dx, a.dy) - Math.hypot(b.dx, b.dy))[0];
+  let dx = 0, dy = 0;
+  for (let i = 0; i < 24; i++) {
+    const contact = deepest(dx, dy);
+    if (!contact) return { dx, dy };
+    dx += contact.nx * (contact.depth + .02);
+    dy += contact.ny * (contact.depth + .02);
+  }
+  // A concave pocket can give opposing contact normals. Search several escape
+  // directions only in that case, keeping the entire group rigid.
+  let best = null;
+  for (let i = 0; i < 32; i++) {
+    const nx = Math.cos(i * Math.PI / 16), ny = Math.sin(i * Math.PI / 16);
+    let high = 8;
+    while (deepest(nx * high, ny * high)) high *= 2;
+    let low = 0;
+    for (let step = 0; step < 16; step++) {
+      const middle = (low + high) / 2;
+      if (deepest(nx * middle, ny * middle)) low = middle;
+      else high = middle;
+    }
+    const distance = high + .03;
+    if ((!best || distance < best.distance) && !deepest(nx * distance, ny * distance)) best = { dx: nx * distance, dy: ny * distance, distance };
+  }
+  return best;
 }
 function pushNeighbours() {
   const activeIds = gesture.type === 'group' ? gesture.ids : [gesture.id];
