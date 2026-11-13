@@ -40,6 +40,8 @@ let history = [];
 let selectedId = null;
 let toastTimer;
 let lastTap = null;
+let outlineMarkup = '';
+let previewGroups = [];
 
 function save() { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {} }
 function announce(text) { document.querySelector('#announcer').textContent = text; }
@@ -69,19 +71,39 @@ function paint() {
     el.classList.toggle('selected', card.id === selectedId);
     el.classList.toggle('moving', gesture?.type === 'card' && gesture.id === card.id && gesture.moved);
   }
+  drawOutlines();
   updateControls();
 }
 
 function drawOutlines() {
-  if (!state.confirmed || !state.review) { outlines.innerHTML = ''; return; }
-  outlines.innerHTML = state.review.groups.map((group, index) => {
+  const confirmed = state.confirmed && state.review && !(gesture?.type === 'card' && gesture.moved);
+  const groups = confirmed ? state.review.groups : spatialClusters().filter(ids => ids.length > 1).map(cardIds => ({ cardIds }));
+  if (!confirmed) {
+    // Keep each area's colour while cards enter, leave, or reorder the clusters.
+    const available = new Set(previewGroups);
+    const usedTones = new Set();
+    for (const group of [...groups].sort((a, b) => b.cardIds.length - a.cardIds.length)) {
+      let match, shared = 0;
+      for (const previous of available) {
+        const count = group.cardIds.filter(id => previous.cardIds.includes(id)).length;
+        if (count > shared) { match = previous; shared = count; }
+      }
+      if (match) { group.tone = match.tone; available.delete(match); }
+      else group.tone = [0, 1, 2, 3].find(tone => !usedTones.has(tone)) ?? groups.indexOf(group) % 4;
+      usedTones.add(group.tone);
+    }
+    previewGroups = groups;
+  }
+  const markup = groups.map((group, index) => {
     const positions = group.cardIds.map(id => state.positions[id]);
     const x = Math.min(...positions.map(p => p.x)) - 12;
-    const y = Math.min(...positions.map(p => p.y)) - 30;
+    const y = Math.min(...positions.map(p => p.y)) - (confirmed ? 30 : 24);
     const right = Math.max(...positions.map(p => p.x + CARD_W)) + 12;
     const bottom = Math.max(...positions.map(p => p.y + CARD_H)) + 12;
-    return `<div class="group-outline tone-${index % 4}" style="left:${x}px;top:${y}px;width:${right - x}px;height:${bottom - y}px"><span>${escape(group.name)}</span></div>`;
+    const label = confirmed ? group.name : `${group.cardIds.length}개 · 묶음 후보`;
+    return `<div aria-hidden="true" class="group-outline ${confirmed ? 'confirmed' : 'preview'} tone-${group.tone ?? index % 4}" data-cards="${group.cardIds.join(',')}" style="left:${x}px;top:${y}px;width:${right - x}px;height:${bottom - y}px"><span>${escape(label)}</span></div>`;
   }).join('');
+  if (markup !== outlineMarkup) { outlines.innerHTML = markup; outlineMarkup = markup; }
 }
 
 function zoomAt(x, y, scale) {
@@ -265,7 +287,7 @@ viewport.addEventListener('focusin', event => {
   if (rect.left < 8 || rect.top < 8 || rect.right > innerWidth - 8 || rect.bottom > innerHeight - 75) focusCard(id);
 });
 
-function inferGroups() {
+function spatialClusters() {
   const parents = catalog.map((_, i) => i);
   function find(i) { while (parents[i] !== i) { parents[i] = parents[parents[i]]; i = parents[i]; } return i; }
   for (let i = 0; i < catalog.length; i++) for (let j = i + 1; j < catalog.length; j++) {
@@ -276,8 +298,11 @@ function inferGroups() {
   }
   const clusters = new Map();
   catalog.forEach((card, i) => { const root = find(i); if (!clusters.has(root)) clusters.set(root, []); clusters.get(root).push(card.id); });
+  return [...clusters.values()];
+}
+function inferGroups() {
   const groups = [], singles = [];
-  for (const ids of clusters.values()) {
+  for (const ids of spatialClusters()) {
     if (ids.length === 1) singles.push(ids[0]);
     else groups.push({ id: crypto.randomUUID(), name: `묶음 ${groups.length + 1}`, cardIds: ids });
   }
