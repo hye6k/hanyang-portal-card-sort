@@ -140,8 +140,11 @@ function drawOutlines() {
   const confirmed = state.confirmed && state.review && !(gesture?.type === 'card' && gesture.moved);
   let groups = confirmed ? state.review.groups : spatialClusters(gesture?.type === 'group' ? gesture.ids : []).filter(ids => ids.length > 1).map(cardIds => ({ cardIds }));
   if ((isCardGesture() && gesture.moved) || gesture?.type === 'group') {
-    // A dragged card must not visually bridge otherwise separate target groups.
-    groups = gesture.others.filter(group => group.cardIds.length > 1).map(group => ({ ...group }));
+    // Show one common outline for exactly the cards in the pending merge.
+    const snap = gesture.type === 'card' ? gesture.snapPlan : null;
+    const targets = new Set(snap?.targetIds || []);
+    groups = gesture.others.filter(group => group.cardIds.length > 1 && !group.cardIds.some(id => targets.has(id))).map(group => ({ ...group }));
+    if (snap) groups.push({ cardIds: snap.ids });
     if (gesture.type === 'group') groups.push({ cardIds: gesture.ids, name: gesture.groupName, held: true });
   }
   if (!confirmed) {
