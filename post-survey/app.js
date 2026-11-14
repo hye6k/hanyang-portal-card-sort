@@ -58,7 +58,7 @@ function renderSelection() {
   }
   const groups = state.sort.groups.map(group => ({ name: group.name, ids: group.card_ids }));
   if (state.sort.ungrouped_card_ids.length) groups.push({ name: '따로 둔 카드', ids: state.sort.ungrouped_card_ids });
-  byId('sort-selection').innerHTML = groups.map(group => `<section class="selection-group"><h3>${esc(group.name)}</h3><div class="selection-grid">${group.ids.map(id => `<article class="selection-card" data-menu="${id}"><p>${esc(cardName(id))}</p><div class="selection-flags"><label><input type="checkbox" data-card-kind="difficult" value="${id}"><span>분류가 애매함</span></label><label><input type="checkbox" data-card-kind="naming" value="${id}"><span>명칭이 어려움</span></label></div></article>`).join('')}</div></section>`).join('');
+  byId('sort-selection').innerHTML = groups.map(group => `<section class="selection-group"><h3>${esc(group.name)}</h3><div class="selection-columns" aria-hidden="true"><span>메뉴</span><span>분류가<br>애매함</span><span>명칭이<br>어려움</span></div><div class="selection-grid">${group.ids.map(id => `<article class="selection-card" data-menu="${id}"><p>${esc(cardName(id))}</p><label class="selection-check"><input type="checkbox" data-card-kind="difficult" value="${id}" aria-label="${esc(cardName(id))}: 분류가 애매함"></label><label class="selection-check"><input type="checkbox" data-card-kind="naming" value="${id}" aria-label="${esc(cardName(id))}: 명칭이 어려움"></label></article>`).join('')}</div></section>`).join('');
 }
 byId('clarity-options').innerHTML = clarityLabels.map((label, i) => `<label class="scale-option"><input type="radio" name="clarity" value="${i + 1}"><span class="scale-number">${i + 1}</span><span class="scale-label">${esc(label)}</span></label>`).join('');
 byId('criterion-options').innerHTML = criteria.map(([value, label]) => `<label class="choice"><input type="radio" name="criterion" value="${value}"><span>${esc(label)}</span></label>`).join('');
@@ -105,7 +105,6 @@ function selectionErrors() {
   const a = state.answers, errors = [];
   for (const kind of ['difficult', 'naming']) {
     if (!a[kind].length && !a[`${kind}_none`]) errors.push([kind, kind === 'difficult' ? '분류가 애매했던 메뉴를 고르거나 ‘없음’을 선택해 주세요.' : '명칭이 어려웠던 메뉴를 고르거나 ‘없음’을 선택해 주세요.']);
-    if (kind === 'difficult' && a[kind].length > 3) errors.push([kind, '분류가 애매했던 메뉴는 최대 3개까지 선택해 주세요.']);
   }
   return errors;
 }
@@ -137,7 +136,7 @@ function syncUI() {
   const frozen = submitting || !!state.pending, questions = state.stage === 'questions';
   byId('response-fields').disabled = frozen;
   syncReasonBlocks();
-  for (const kind of ['difficult', 'naming']) form.querySelectorAll(`[data-card-kind="${kind}"]`).forEach(el => { el.checked = state.answers[kind].includes(el.value); el.disabled = kind === 'difficult' && state.answers.difficult.length >= 3 && !el.checked; });
+  for (const kind of ['difficult', 'naming']) form.querySelectorAll(`[data-card-kind="${kind}"]`).forEach(el => { el.checked = state.answers[kind].includes(el.value); el.disabled = false; });
   byId('selection-panel').hidden = questions; byId('questions-panel').hidden = !questions;
   byId('back-selection').hidden = !questions; byId('back-selection').disabled = frozen;
   byId('next-questions').hidden = questions; byId('next-questions').disabled = !state.sort || frozen;
@@ -152,7 +151,7 @@ function syncUI() {
   if (!form.querySelector('[data-invalid]')) byId('validation-summary').hidden = true;
 }
 function saveCurrent() { if (!state.pending && !state.done) state.answers = readAnswers(); state.scroll[state.stage] = scrollY; persist(); }
-function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-1'); url.searchParams.delete('from'); return url.pathname + url.search; }
+function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-2'); url.searchParams.delete('from'); return url.pathname + url.search; }
 function showStage(stage, push = true) {
   saveCurrent(); state.stage = stage; persist();
   if (push) history.pushState({ stage }, '', stageUrl(stage));
