@@ -86,7 +86,6 @@ function syncReasonBlocks() {
   byId('menu-reasons-section').hidden = !selected.length;
 }
 function restoreFields() {
-  for (const kind of ['difficult', 'naming']) form.elements.namedItem(`${kind}_none`).checked = state.answers[`${kind}_none`];
   for (const name of ['clarity', 'criterion']) form.querySelectorAll(`[name="${name}"]`).forEach(el => { el.checked = el.value === String(state.answers[name] || ''); });
   byId('criterion-other').value = state.answers.criterion_other; form.elements.namedItem('consent').checked = state.answers.consent;
 }
@@ -94,19 +93,12 @@ function readAnswers() {
   const a = copy(state.answers);
   for (const kind of ['difficult', 'naming']) {
     if (state.sort) a[kind] = [...form.querySelectorAll(`[data-card-kind="${kind}"]:checked`)].map(el => el.value);
-    a[`${kind}_none`] = form.elements.namedItem(`${kind}_none`).checked;
+    a[`${kind}_none`] = a[kind].length === 0;
     form.querySelectorAll(`[data-reason-kind="${kind}"]`).forEach(block => { a[`${kind}_reasons`][block.dataset.cardId] = { selected: [...block.querySelectorAll('[data-reason]:checked')].map(el => el.value), other: block.querySelector('[data-other]').value }; });
     a[kind].forEach(id => { a[`${kind}_reasons`][id] ||= { selected: [], other: '' }; });
   }
   a.clarity = Number(form.querySelector('[name="clarity"]:checked')?.value) || null; a.criterion = form.querySelector('[name="criterion"]:checked')?.value || ''; a.criterion_other = byId('criterion-other').value; a.consent = form.elements.namedItem('consent').checked;
   return a;
-}
-function selectionErrors() {
-  const a = state.answers, errors = [];
-  for (const kind of ['difficult', 'naming']) {
-    if (!a[kind].length && !a[`${kind}_none`]) errors.push([kind, kind === 'difficult' ? '분류가 애매했던 메뉴를 고르거나 ‘없음’을 선택해 주세요.' : '명칭이 어려웠던 메뉴를 고르거나 ‘없음’을 선택해 주세요.']);
-  }
-  return errors;
 }
 function questionErrors() {
   const errors = [], a = state.answers;
@@ -151,7 +143,7 @@ function syncUI() {
   if (!form.querySelector('[data-invalid]')) byId('validation-summary').hidden = true;
 }
 function saveCurrent() { if (!state.pending && !state.done) state.answers = readAnswers(); state.scroll[state.stage] = scrollY; persist(); }
-function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-2'); url.searchParams.delete('from'); return url.pathname + url.search; }
+function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-3'); url.searchParams.delete('from'); return url.pathname + url.search; }
 function showStage(stage, push = true) {
   saveCurrent(); state.stage = stage; persist();
   if (push) history.pushState({ stage }, '', stageUrl(stage));
@@ -162,11 +154,10 @@ function editGroups() { if (state.pending || state.done || submitting) return; s
 byId('edit-groups').addEventListener('click', editGroups);
 byId('sort-selection').addEventListener('click', event => { if (event.target.closest('[data-start-sort]')) editGroups(); });
 byId('back-selection').addEventListener('click', () => { if (!state.pending && !submitting) showStage('select'); });
-byId('next-questions').addEventListener('click', () => { if (state.pending || submitting || !state.sort) return; state.answers = readAnswers(); const errors = selectionErrors(); if (errors.length) { showErrors(errors); return; } showStage('questions'); });
+byId('next-questions').addEventListener('click', () => { if (state.pending || submitting || !state.sort) return; state.answers = readAnswers(); showStage('questions'); });
 form.addEventListener('input', event => {
   if (state.pending || state.done || submitting) return;
-  const kind = event.target.dataset.cardKind || (event.target.name === 'difficult_none' ? 'difficult' : event.target.name === 'naming_none' ? 'naming' : null);
-  if (kind && event.target.checked) { if (event.target.name === `${kind}_none`) form.querySelectorAll(`[data-card-kind="${kind}"]`).forEach(el => { el.checked = false; }); else form.elements.namedItem(`${kind}_none`).checked = false; }
+  const kind = event.target.dataset.cardKind;
   state.answers = readAnswers(); clearError(kind || event.target.closest('[data-question]')?.dataset.question); persist(); syncUI();
 });
 function buildRecord() {
@@ -176,8 +167,8 @@ function buildRecord() {
 form.addEventListener('submit', async event => {
   event.preventDefault(); if (submitting || state.done) return;
   if (!state.pending) {
-    state.answers = readAnswers(); const selectedErrors = selectionErrors();
-    if (state.stage !== 'questions' || !state.sort || selectedErrors.length) { showStage('select'); if (selectedErrors.length) showErrors(selectedErrors); return; }
+    state.answers = readAnswers();
+    if (state.stage !== 'questions' || !state.sort) { showStage('select'); return; }
     const errors = questionErrors(); if (errors.length) { showErrors(errors); return; }
     state.sort = readSort(); if (!state.sort) { renderSelection(); showStage('select'); return; }
     state.pending = buildRecord(); persist();
@@ -187,10 +178,10 @@ form.addEventListener('submit', async event => {
   catch { byId('submit-error').textContent = '저장 완료를 확인하지 못했습니다. 연결 상태를 확인한 뒤 다시 제출해 주세요. 작성한 응답은 유지됩니다.'; byId('submit-error').hidden = false; }
   finally { submitting = false; syncUI(); }
 });
-window.addEventListener('popstate', () => { saveCurrent(); let stage = new URLSearchParams(location.search).get('stage') === 'questions' ? 'questions' : 'select'; if (state.pending || state.done) stage = 'questions'; if (!state.pending && !state.done && (selectionErrors().length || !state.sort)) stage = 'select'; showStage(stage, false); });
+window.addEventListener('popstate', () => { saveCurrent(); let stage = new URLSearchParams(location.search).get('stage') === 'questions' ? 'questions' : 'select'; if (state.pending || state.done) stage = 'questions'; if (!state.pending && !state.done && !state.sort) stage = 'select'; showStage(stage, false); });
 window.addEventListener('pagehide', saveCurrent);
 window.addEventListener('pageshow', event => { if (!event.persisted || state.pending || state.done) return; state.sort = readSort(); renderSelection(); restoreFields(); state.stage = 'select'; syncUI(); persist(); history.replaceState({ stage: state.stage }, '', stageUrl(state.stage)); requestAnimationFrame(() => window.scrollTo({ top: state.scroll.select || 0, behavior: 'instant' })); });
 renderSelection(); restoreFields();
-if (!state.pending && !state.done && (selectionErrors().length || !state.sort)) state.stage = 'select';
+if (!state.pending && !state.done && !state.sort) state.stage = 'select';
 syncUI(); persist(); history.replaceState({ stage: state.stage }, '', stageUrl(state.stage));
 requestAnimationFrame(() => window.scrollTo({ top: state.scroll[state.stage] || 0, behavior: 'instant' }));

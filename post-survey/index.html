@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow">
   <title>애매했던 메뉴 선택</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=flow-2">
+  <link rel="stylesheet" href="./style.css?v=flow-3">
 </head>
 <body>
   <a class="skip-link" href="#post-form">본문으로 이동</a>
@@ -22,10 +22,6 @@
         <section id="selection-panel" class="question" aria-labelledby="selection-title">
           <div class="question-heading"><h2 id="selection-title">분류하면서 고민했던 메뉴를 골라주세요.</h2></div>
           <p class="selection-help">분류가 애매했는지, 명칭만으로 뜻을 이해하기 어려웠는지 표시해 주세요.<br>해당하는 메뉴를 모두 선택해 주세요. 두 항목을 함께 표시해도 됩니다.</p>
-          <div class="selection-none">
-            <div data-question="difficult"><label class="choice"><input type="checkbox" name="difficult_none"><span>분류가 애매했던 메뉴 없음</span></label><p class="field-error" id="difficult-error" hidden></p></div>
-            <div data-question="naming"><label class="choice"><input type="checkbox" name="naming_none"><span>명칭이 어려웠던 메뉴 없음</span></label><p class="field-error" id="naming-error" hidden></p></div>
-          </div>
           <div id="sort-selection"></div>
         </section>
         <div id="questions-panel" class="questions-panel" hidden>
@@ -56,6 +52,6 @@
   </main>
   <div class="sr-only" id="announcer" aria-live="polite"></div>
   <noscript>응답하려면 브라우저에서 JavaScript를 허용해 주세요.</noscript>
-  <script type="module" src="./app.js?v=flow-2"></script>
+  <script type="module" src="./app.js?v=flow-3"></script>
 </body>
 </html>
