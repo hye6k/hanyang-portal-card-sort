@@ -284,7 +284,58 @@ function makeSnapPlan() {
 }
 function applySnap(plan) {
   for (const id of plan.ids) Object.assign(state.positions[id], plan.placements[id]);
-  for (const id of plan.ids) {
+}
+function chooseGrid(count) {
+  let best = null;
+  for (let cols = count >= 4 ? 2 : 1; cols <= count; cols++) {
+    const rows = Math.ceil(count / cols), empty = cols * rows - count;
+    const width = cols * CARD_W + (cols - 1) * SNAP_GAP;
+    const height = rows * CARD_H + (rows - 1) * SNAP_GAP;
+    const score = Math.abs(Math.log(width / height)) + (empty ? .8 + empty / count * 1.5 : 0);
+    if (!best || score < best.score) best = { cols, rows, width, height, score };
+  }
+  return best;
+}
+function arrangementOrigin(grid, ids) {
+  const members = new Set(ids), points = ids.map(id => state.positions[id]);
+  const left = Math.min(...points.map(p => p.x)), right = Math.max(...points.map(p => p.x + CARD_W));
+  const top = Math.min(...points.map(p => p.y)), bottom = Math.max(...points.map(p => p.y + CARD_H));
+  const maxX = 10000 - (grid.cols - 1) * (CARD_W + SNAP_GAP), maxY = 10000 - (grid.rows - 1) * (CARD_H + SNAP_GAP);
+  const preferred = { x: clamp((left + right - grid.width) / 2, -10000, maxX), y: clamp((top + bottom - grid.height) / 2, -10000, maxY) };
+  const outside = catalog.filter(card => !members.has(card.id)).map(card => state.positions[card.id]);
+  const margin = 44;
+  const free = p => outside.every(other => p.x + grid.width + margin <= other.x + .001 || other.x + CARD_W + margin <= p.x + .001 || p.y + grid.height + margin <= other.y + .001 || other.y + CARD_H + margin <= p.y + .001);
+  if (free(preferred)) return preferred;
+  const xs = new Set([preferred.x, -10000, maxX]), ys = new Set([preferred.y, -10000, maxY]);
+  for (const other of outside) {
+    xs.add(clamp(other.x - grid.width - margin, -10000, maxX)); xs.add(clamp(other.x + CARD_W + margin, -10000, maxX));
+    ys.add(clamp(other.y - grid.height - margin, -10000, maxY)); ys.add(clamp(other.y + CARD_H + margin, -10000, maxY));
+  }
+  const candidates = [];
+  for (const x of xs) for (const y of ys) candidates.push({ x, y });
+  candidates.sort((a, b) => (a.x - preferred.x) ** 2 + (a.y - preferred.y) ** 2 - (b.x - preferred.x) ** 2 - (b.y - preferred.y) ** 2);
+  return candidates.find(free);
+}
+function arrangeMerged(activeIds, targetIds = []) {
+  const active = new Set(activeIds), clusters = spatialClusters();
+  const joined = clusters.filter(ids => ids.some(id => active.has(id)) && ids.some(id => !active.has(id)));
+  if (!joined.length && !targetIds.length) return [];
+  const members = new Set([...activeIds, ...targetIds, ...joined.flat()]);
+  if (state.confirmed && state.review) for (const group of state.review.groups) {
+    if (group.cardIds.some(id => !active.has(id) && members.has(id))) group.cardIds.forEach(id => members.add(id));
+  }
+  for (const ids of clusters) if (ids.some(id => members.has(id))) ids.forEach(id => members.add(id));
+  const ids = [...members].sort((a, b) => state.positions[a].y - state.positions[b].y || state.positions[a].x - state.positions[b].x);
+  const grid = chooseGrid(ids.length), origin = arrangementOrigin(grid, ids);
+  if (!origin) return [];
+  ids.forEach((id, i) => {
+    state.positions[id].x = origin.x + (i % grid.cols) * (CARD_W + SNAP_GAP);
+    state.positions[id].y = origin.y + Math.floor(i / grid.cols) * (CARD_H + SNAP_GAP);
+  });
+  return ids;
+}
+function animateArrangement(ids) {
+  for (const id of ids) {
     const el = cardsElement.querySelector(`[data-id="${id}"]`);
     el.classList.add('snap-settling');
     setTimeout(() => el.classList.remove('snap-settling'), 170);
@@ -397,8 +448,10 @@ function finishPointer(event, cancelled = false) {
         const wasGroup = gesture.type === 'group';
         const snap = makeSnapPlan();
         if (snap) applySnap(snap);
-        remember(gesture.snapshot, wasGroup || !!snap);
-        if (snap || !wasGroup || !state.confirmed) invalidate();
+        const arranged = arrangeMerged(wasGroup ? gesture.ids : [gesture.id], snap?.targetIds || []);
+        animateArrangement(arranged.length ? arranged : snap?.ids || []);
+        remember(gesture.snapshot, wasGroup || !!snap || !!arranged.length);
+        if (snap || arranged.length || !wasGroup || !state.confirmed) invalidate();
       }
       else if (gesture.type === 'card') {
         if (lastTap?.id === gesture.id && Date.now() - lastTap.time < 330) focusCard(gesture.id);
