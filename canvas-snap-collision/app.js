@@ -75,13 +75,12 @@ function armGroupHold() {
   const pending = gesture;
   holdTimer = setTimeout(() => {
     if (gesture !== pending || pending.moved || pointers.size !== 1) return;
-    const confirmedGroup = state.confirmed && state.review?.groups.find(group => group.cardIds.includes(pending.id));
-    const ids = confirmedGroup?.cardIds || spatialClusters().find(ids => ids.includes(pending.id));
-    if (!ids || ids.length < 2) return;
-    pending.type = 'group'; pending.ids = [...ids]; pending.groupName = confirmedGroup?.name;
-    pending.others = movementGroups(ids);
+    const group = ensureGroups().groups.find(group => group.cardIds.includes(pending.id));
+    if (!group) return;
+    pending.type = 'group'; pending.ids = [...group.cardIds]; pending.groupName = group.name; pending.groupId = group.id; pending.groupTone = group.tone;
+    pending.others = movementGroups(pending.ids);
     lastTap = null;
-    announce(`${ids.length}개 묶음 선택`);
+    announce(`${pending.ids.length}개 묶음 선택`);
     paint();
   }, 500);
 }
@@ -89,8 +88,8 @@ function armGroupHold() {
 function save() { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {} }
 function announce(text) { document.querySelector('#announcer').textContent = text; }
 function notify(text) { const el = document.querySelector('#toast'); clearTimeout(toastTimer); el.textContent = text; el.classList.add('visible'); toastTimer = setTimeout(() => el.classList.remove('visible'), 2600); announce(text); }
-function remember(snapshot, preserveClassification = false) {
-  history.push({ positions: snapshot, classification: preserveClassification ? { review: copy(state.review), confirmed: state.confirmed, confirmedAt: state.confirmedAt } : null });
+function remember(snapshot) {
+  history.push({ positions: snapshot, classification: { review: copy(ensureGroups()), confirmed: state.confirmed, confirmedAt: state.confirmedAt } });
   if (history.length > 20) history.shift();
   future = [];
   updateControls();
@@ -104,7 +103,41 @@ function restoreHistory(entry) {
   else invalidate();
   paint(); save();
 }
-function invalidate() { state.review = null; state.confirmed = false; drawOutlines(); updateControls(); }
+function ensureGroups() {
+  state.review ||= inferGroups();
+  state.review.groups.forEach((group, i) => { group.tone ??= i % 4; });
+  return state.review;
+}
+function refreshSingles() {
+  const review = ensureGroups();
+  review.groups = review.groups.filter(group => group.cardIds.length);
+  const assigned = new Set(review.groups.flatMap(group => group.cardIds));
+  review.singles = catalog.filter(card => !assigned.has(card.id)).map(card => card.id);
+}
+function commitCardMove(id, snap) {
+  const review = ensureGroups();
+  const source = review.groups.find(group => group.cardIds.includes(id));
+  const target = snap?.targetGroupId ? review.groups.find(group => group.id === snap.targetGroupId) : null;
+  if (snap) {
+    if (source && source !== target) source.cardIds = source.cardIds.filter(member => member !== id);
+    if (target) target.cardIds = [...new Set([...target.cardIds, ...snap.ids])];
+    else {
+      const number = Math.max(review.nextGroup || 1, 1);
+      review.nextGroup = number + 1;
+      review.groups.push({ id: crypto.randomUUID(), name: `묶음 ${number}`, tone: [0, 1, 2, 3].find(tone => !review.groups.some(group => group.tone === tone)) ?? number % 4, cardIds: [...snap.ids] });
+    }
+  } else if (source && source.cardIds.length > 1) {
+    const p = state.positions[id];
+    const stillInside = source.cardIds.some(member => {
+      if (member === id) return false;
+      const other = state.positions[member];
+      return Math.hypot(Math.max(0, p.x - other.x - CARD_W, other.x - p.x - CARD_W), Math.max(0, p.y - other.y - CARD_H, other.y - p.y - CARD_H)) <= GAP;
+    });
+    if (!stillInside) source.cardIds = source.cardIds.filter(member => member !== id);
+  }
+  refreshSingles();
+}
+function invalidate() { state.confirmed = false; drawOutlines(); updateControls(); }
 function updateControls() {
   document.querySelector('[data-action=undo]').disabled = !history.length;
   document.querySelector('[data-action=redo]').disabled = !future.length;
@@ -149,14 +182,18 @@ function paint() {
 
 function drawOutlines() {
   const confirmed = state.confirmed && state.review && !(gesture?.type === 'card' && gesture.moved);
-  let groups = confirmed ? state.review.groups : spatialClusters(gesture?.type === 'group' ? gesture.ids : []).filter(ids => ids.length > 1).map(cardIds => ({ cardIds }));
+  let groups = ensureGroups().groups.map(group => ({ ...group }));
   if ((isCardGesture() && gesture.moved) || gesture?.type === 'group') {
     // Show one common outline for exactly the cards in the pending merge.
     const snap = gesture.type === 'card' ? gesture.snapPlan : null;
     const targets = new Set(snap?.targetIds || []);
-    groups = gesture.others.filter(group => group.cardIds.length > 1 && !group.cardIds.some(id => targets.has(id))).map(group => ({ ...group }));
-    if (snap) groups.push({ cardIds: snap.ids });
-    if (gesture.type === 'group') groups.push({ cardIds: gesture.ids, name: gesture.groupName, held: true });
+    groups = gesture.others.filter(group => (group.id || group.cardIds.length > 1) && !group.cardIds.some(id => targets.has(id))).map(group => ({ ...group }));
+    if (snap) groups.push({ cardIds: snap.ids, name: snap.targetName, tone: snap.targetTone });
+    if (gesture.type === 'group') groups.push({ id: gesture.groupId, cardIds: gesture.ids, name: gesture.groupName, tone: gesture.groupTone, held: true });
+    else if (!snap) {
+      const single = state.review.groups.find(group => group.cardIds.length === 1 && group.cardIds[0] === gesture.id);
+      if (single) groups.push({ ...single });
+    }
   }
   if (!confirmed) {
     // Keep each area's colour while cards enter, leave, or reorder the clusters.
@@ -168,8 +205,8 @@ function drawOutlines() {
         const count = group.cardIds.filter(id => previous.cardIds.includes(id)).length;
         if (count > shared) { match = previous; shared = count; }
       }
-      if (match) { group.tone = match.tone; available.delete(match); }
-      else group.tone = [0, 1, 2, 3].find(tone => !usedTones.has(tone)) ?? groups.indexOf(group) % 4;
+      if (match) { group.tone ??= match.tone; available.delete(match); }
+      else group.tone ??= [0, 1, 2, 3].find(tone => !usedTones.has(tone)) ?? groups.indexOf(group) % 4;
       usedTones.add(group.tone);
     }
     previewGroups = groups;
@@ -181,7 +218,7 @@ function drawOutlines() {
     const right = Math.max(...positions.map(p => p.x + CARD_W)) + GROUP_PADDING;
     const bottom = Math.max(...positions.map(p => p.y + CARD_H)) + GROUP_PADDING;
     const anchor = [...positions].sort((a, b) => a.y - b.y || a.x - b.x)[0];
-    const label = confirmed ? group.name : null;
+    const label = group.name?.trim() || null;
     const labelMarkup = label ? `<span style="left:${anchor.x - x + 4}px;top:${anchor.y - y - 19}px">${escape(label)}</span>` : '';
     const width = right - x, height = bottom - y;
     return `<div aria-hidden="true" class="group-outline ${confirmed ? 'confirmed' : 'preview'} ${group.held ? 'group-held' : ''} tone-${group.tone ?? index % 4}" data-cards="${group.cardIds.join(',')}" style="left:${x}px;top:${y}px;width:${width}px;height:${height}px"><svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path fill-rule="evenodd" d="${roundedContour(positions, x, y)}"/></svg>${labelMarkup}</div>`;
@@ -288,7 +325,8 @@ function makeSnapPlan() {
       x: origin.x + (i % grid.cols) * (CARD_W + SNAP_GAP),
       y: origin.y + Math.floor(i / grid.cols) * (CARD_H + SNAP_GAP)
     }]));
-    return { ids, targetIds: [...group.cardIds], placements };
+    const destination = group.id ? group : ensureGroups().groups.find(existing => existing.cardIds.length === 1 && existing.cardIds[0] === id);
+    return { ids, targetIds: [...group.cardIds], targetGroupId: destination?.id || null, targetName: destination?.name, targetTone: destination?.tone, placements };
   }
   return null;
 }
@@ -363,9 +401,8 @@ function collisionContact(a, b, clearance) {
 }
 function overlaps(a, b, clearance = 0) { return collisionContact(a, b, clearance) !== null; }
 function movementGroups(activeIds) {
-  if (!state.confirmed || !state.review) return spatialClusters(activeIds).map(cardIds => ({ cardIds }));
   const excluded = new Set(activeIds);
-  const groups = state.review.groups.map(group => ({ name: group.name, cardIds: group.cardIds.filter(id => !excluded.has(id)) })).filter(group => group.cardIds.length);
+  const groups = ensureGroups().groups.map(group => ({ ...group, cardIds: group.cardIds.filter(id => !excluded.has(id)) })).filter(group => group.cardIds.length);
   const assigned = new Set([...activeIds, ...groups.flatMap(group => group.cardIds)]);
   for (const card of catalog) if (!assigned.has(card.id)) groups.push({ cardIds: [card.id] });
   return groups;
@@ -513,7 +550,8 @@ function finishPointer(event, cancelled = false) {
         const wasGroup = gesture.type === 'group';
         const snap = gesture.snapPlan;
         if (snap) { applySnap(snap); animateArrangement(snap.ids); }
-        remember(gesture.snapshot, wasGroup || !!snap);
+        remember(gesture.snapshot);
+        if (!wasGroup) commitCardMove(gesture.id, snap);
         if (snap || !wasGroup || !state.confirmed) invalidate();
       }
       else if (gesture.type === 'card') {
@@ -551,6 +589,7 @@ viewport.addEventListener('keydown', event => {
   state.positions[id].x += dx * (event.shiftKey ? 40 : 12);
   state.positions[id].y += dy * (event.shiftKey ? 40 : 12);
   pushNeighbours();
+  commitCardMove(id, null);
   gesture = null;
   invalidate(); paint(); save(); announce(`${cardName(id)} 위치 이동`);
 });
@@ -594,7 +633,7 @@ function renderReview() {
   reviewDialog.innerHTML = `<div class="review-heading"><h1>묶음 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group tone-${index % 4}"><div class="review-group-heading"><label><span class="sr-only">묶음 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="묶음 이름" maxlength="60" aria-label="${index + 1}번째 묶음 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">${state.confirmed ? '완료' : '확정'}</button></div>`;
 }
 function showReview() {
-  if (!state.review) state.review = inferGroups();
+  ensureGroups();
   renderReview(); reviewDialog.showModal(); save();
 }
 function resetTest() {
