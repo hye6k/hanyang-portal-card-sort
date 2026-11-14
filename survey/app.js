@@ -55,22 +55,48 @@ byId('frequency-options').innerHTML = radioOptions('frequency', frequencyOptions
 byId('difficulty-options').innerHTML = radioOptions('difficulty', difficultyOptions.map((label, i) => [i + 1, label]), true);
 byId('ease-options').innerHTML = radioOptions('ease', easeOptions.map((label, i) => [i + 1, label]), true);
 
-const functionLabel = (item, index) => item.cannot_recall ? `기억나지 않는 기능 ${index + 1}` : item.name.trim() || `기능 ${index + 1}`;
+const hasFunction = item => !!item.name.trim() || item.cannot_recall;
+const functionLabel = (item, index) => item.cannot_recall ? `기억나지 않는 기능 ${index + 1}` : item.name.trim();
+function ensureBlankFunction() {
+  if (!state.pending && !state.done && hasFunction(state.answers.functions.at(-1))) state.answers.functions.push(newFunction());
+}
 function renderFunctions() {
-  const list = state.answers.functions;
-  byId('function-list').innerHTML = list.map((item, i) => `<div class="function-entry" data-function-row="${item.id}" data-question="function-${item.id}">
-    <div class="function-row-heading"><label for="function-name-${item.id}">기능 ${i + 1}</label>${list.length > 1 ? `<button type="button" class="remove-function" data-action="remove-function" data-function-id="${item.id}" aria-label="${i + 1}번째 기능 삭제">×</button>` : ''}</div>
-    <input id="function-name-${item.id}" data-function-name type="text" value="${esc(item.name)}" maxlength="200" placeholder="기능명을 입력해 주세요." aria-describedby="function-${item.id}-error">
-    <label class="check-option recall-option"><input type="checkbox" data-cannot-recall ${item.cannot_recall ? 'checked' : ''}><span>기억나지 않음</span></label>
-    <p class="field-error" id="function-${item.id}-error" hidden></p>
-  </div>`).join('');
-  byId('reason-list').innerHTML = list.map((item, i) => `<fieldset class="reason-item" data-reason-for="${item.id}" data-question="reason-${item.id}" aria-labelledby="reason-title-${item.id}" aria-describedby="reason-${item.id}-error">
-    <legend class="sr-only">${i + 1}번째 기능의 불편한 점</legend>
-    <h3 class="reason-title" id="reason-title-${item.id}"><span class="question-number">05-${i + 1}</span><span data-function-heading>${esc(functionLabel(item, i))}</span></h3>
-    <div class="options">${reasonOptions.map(([value, label]) => `<label class="choice"><input type="checkbox" data-reason value="${value}" ${item.reasons.includes(value) ? 'checked' : ''}><span>${esc(label)}</span></label>`).join('')}</div>
-    <div class="other-field" data-other-field ${item.reasons.includes('other') ? '' : 'hidden'}><label for="other-reason-${item.id}">기타 이유</label><textarea id="other-reason-${item.id}" data-other-reason rows="3" maxlength="800" placeholder="이유를 간단히 입력해 주세요." aria-describedby="reason-${item.id}-error">${esc(item.other_reason)}</textarea></div>
-    <p class="field-error" id="reason-${item.id}-error" hidden></p>
-  </fieldset>`).join('');
+  const list = state.answers.functions, ids = new Set(list.map(item => item.id));
+  const filled = list.filter(hasFunction), filledIds = new Set(filled.map(item => item.id));
+  byId('function-list').querySelectorAll('[data-function-row]').forEach(el => { if (!ids.has(el.dataset.functionRow)) el.remove(); });
+  byId('reason-list').querySelectorAll('[data-reason-for]').forEach(el => { if (!filledIds.has(el.dataset.reasonFor)) el.remove(); });
+  for (const [i, item] of list.entries()) {
+    let row = byId(`function-name-${item.id}`)?.closest('[data-function-row]');
+    if (!row) {
+      byId('function-list').insertAdjacentHTML('beforeend', `<div class="function-entry" data-function-row="${item.id}" data-question="function-${item.id}">
+        <label class="sr-only" for="function-name-${item.id}">기능 ${i + 1}</label>
+        <div class="function-input-row"><input id="function-name-${item.id}" data-function-name type="text" value="${esc(item.name)}" maxlength="200" aria-describedby="function-hint function-${item.id}-error"><button type="button" class="remove-function" data-action="remove-function" data-function-id="${item.id}" aria-label="기능 삭제">×</button></div>
+        <label class="check-option recall-option"><input type="checkbox" data-cannot-recall ${item.cannot_recall ? 'checked' : ''}><span>기억나지 않음</span></label>
+        <p class="field-error" id="function-${item.id}-error" hidden></p>
+      </div>`);
+      row = byId(`function-name-${item.id}`).closest('[data-function-row]');
+    }
+    row.querySelector('label.sr-only').textContent = `기능 ${i + 1}`;
+    row.querySelector('.remove-function').hidden = !hasFunction(item);
+  }
+  for (const [i, item] of filled.entries()) {
+    let reason = form.querySelector(`[data-reason-for="${item.id}"]`);
+    if (!reason) {
+      byId('reason-list').insertAdjacentHTML('beforeend', `<fieldset class="reason-item" data-reason-for="${item.id}" data-question="reason-${item.id}" aria-labelledby="reason-title-${item.id}" aria-describedby="reason-${item.id}-error">
+        <legend class="sr-only">기능의 불편한 점</legend>
+        <h4 class="reason-title" id="reason-title-${item.id}"><span class="question-number"></span><span data-function-heading></span></h4>
+        <div class="options">${reasonOptions.map(([value, label]) => `<label class="choice"><input type="checkbox" data-reason value="${value}" ${item.reasons.includes(value) ? 'checked' : ''}><span>${esc(label)}</span></label>`).join('')}</div>
+        <div class="other-field" data-other-field ${item.reasons.includes('other') ? '' : 'hidden'}><label for="other-reason-${item.id}">기타 이유</label><textarea id="other-reason-${item.id}" data-other-reason rows="3" maxlength="800" placeholder="이유를 간단히 입력해 주세요." aria-describedby="reason-${item.id}-error">${esc(item.other_reason)}</textarea></div>
+        <p class="field-error" id="reason-${item.id}-error" hidden></p>
+      </fieldset>`);
+      reason = form.querySelector(`[data-reason-for="${item.id}"]`);
+    }
+    reason.querySelector('.question-number').textContent = `04-${i + 1}`;
+    reason.querySelector('[data-function-heading]').textContent = functionLabel(item, i);
+    // Keep DOM order aligned when an earlier empty input becomes a named function.
+    const next = byId('reason-list').children[i];
+    if (next !== reason) byId('reason-list').insertBefore(reason, next || null);
+  }
 }
 function restoreFields() {
   const a = state.answers;
@@ -91,8 +117,8 @@ function readFields() {
       const reason = form.querySelector(`[data-reason-for="${item.id}"]`);
       return { id: item.id, name: row.querySelector('[data-function-name]').value,
         cannot_recall: row.querySelector('[data-cannot-recall]').checked,
-        reasons: [...reason.querySelectorAll('[data-reason]:checked')].map(el => el.value),
-        other_reason: reason.querySelector('[data-other-reason]').value };
+        reasons: reason ? [...reason.querySelectorAll('[data-reason]:checked')].map(el => el.value) : [...item.reasons],
+        other_reason: reason ? reason.querySelector('[data-other-reason]').value : item.other_reason };
     }),
   };
 }
@@ -101,8 +127,9 @@ function errorsFor(a) {
   if (![a.student_number, a.department, a.participant_name].every(v => v?.trim())) errors.push(['participant', '학번, 학과, 이름을 모두 입력해 주세요.']);
   if (!frequencyOptions.some(([value]) => value === a.frequency)) errors.push(['frequency', '이용 빈도를 선택해 주세요.']);
   if (![1, 2, 3, 4, 5].includes(a.difficulty)) errors.push(['difficulty', '어려움을 겪은 빈도를 선택해 주세요.']);
-  if (a.difficulty !== 1) for (const [i, item] of a.functions.entries()) {
-    if (!item.cannot_recall && !item.name.trim()) errors.push([`function-${item.id}`, `기능 ${i + 1}의 이름을 입력하거나 ‘기억나지 않음’을 선택해 주세요.`]);
+  const filled = a.functions.filter(hasFunction);
+  if (a.difficulty !== 1 && !filled.length) errors.push(['hardest', '기능의 명칭이나 간단한 설명을 작성하거나 ‘기억나지 않음’을 선택해 주세요.']);
+  if (a.difficulty !== 1) for (const item of filled) {
     if (!item.reasons.length) errors.push([`reason-${item.id}`, '이 기능을 찾기 어려웠던 이유를 하나 이상 선택해 주세요.']);
     else if (item.reasons.includes('other') && !item.other_reason.trim()) errors.push([`reason-${item.id}`, '이 기능의 기타 이유를 입력해 주세요.']);
   }
@@ -137,18 +164,17 @@ function showErrors(errors) {
 function syncUI() {
   const a = state.answers, noDifficulty = a.difficulty === 1;
   fields.disabled = submitting || !!state.pending;
-  for (const key of ['hardest', 'reasons']) {
-    const section = form.querySelector(`[data-question="${key}"]`);
-    section.dataset.skipped = String(noDifficulty);
-    byId(`${key}-skipped`).hidden = !noDifficulty;
-    byId(`${key}-fields`).hidden = noDifficulty;
-    byId(`${key}-fields`).disabled = noDifficulty;
-    if (noDifficulty) clearError(key);
-  }
-  for (const [i, item] of a.functions.entries()) {
-    const input = byId(`function-name-${item.id}`), reason = form.querySelector(`[data-reason-for="${item.id}"]`);
-    input.disabled = noDifficulty || item.cannot_recall;
-    reason.querySelector('[data-function-heading]').textContent = functionLabel(item, i);
+  byId('hardest-skipped').hidden = !noDifficulty;
+  byId('hardest-fields').hidden = noDifficulty;
+  byId('hardest-fields').disabled = noDifficulty;
+  byId('function-hint').hidden = noDifficulty;
+  byId('function-followups').hidden = noDifficulty || !a.functions.some(hasFunction);
+  byId('reasons-fields').disabled = noDifficulty;
+  if (noDifficulty) clearError('hardest');
+  for (const item of a.functions) {
+    byId(`function-name-${item.id}`).disabled = noDifficulty || item.cannot_recall;
+    const reason = form.querySelector(`[data-reason-for="${item.id}"]`);
+    if (!reason) continue;
     reason.querySelector('[data-other-field]').hidden = !item.reasons.includes('other');
     reason.querySelector('[data-other-reason]').disabled = noDifficulty || !item.reasons.includes('other');
   }
@@ -167,7 +193,7 @@ function buildRecord(a) {
       answers: {
         portal_frequency: a.frequency, navigation_difficulty_frequency: a.difficulty,
         functions_not_applicable: noDifficulty,
-        difficult_functions: noDifficulty ? [] : a.functions.map(item => ({
+        difficult_functions: noDifficulty ? [] : a.functions.filter(hasFunction).map(item => ({
           id: item.id, recall_status: item.cannot_recall ? 'cannot_recall' : 'named', function_name: item.cannot_recall ? null : item.name.trim(),
           difficulty_reasons: { selected: [...item.reasons], other: item.reasons.includes('other') ? item.other_reason.trim() : null },
         })),
@@ -188,7 +214,7 @@ function update(event) {
   if (event.target.matches('[data-cannot-recall]') && event.target.checked) event.target.closest('[data-function-row]').querySelector('[data-function-name]').value = '';
   state.answers = readFields();
   clearError(event.target.closest('[data-question]')?.dataset.question);
-  persist(); syncUI();
+  ensureBlankFunction(); renderFunctions(); persist(); syncUI();
 }
 form.addEventListener('input', update);
 form.addEventListener('change', update);
@@ -196,18 +222,12 @@ form.addEventListener('click', event => {
   const target = event.target.closest('[data-action]');
   if (!target || state.pending || state.done || submitting || state.answers.difficulty === 1) return;
   state.answers = readFields();
-  let focusId;
-  if (target.dataset.action === 'add-function') {
-    const item = newFunction(); state.answers.functions.push(item); focusId = item.id;
-  } else if (target.dataset.action === 'remove-function' && state.answers.functions.length > 1) {
-    const index = state.answers.functions.findIndex(item => item.id === target.dataset.functionId);
-    if (index < 0) return;
-    state.answers.functions.splice(index, 1);
-    focusId = state.answers.functions[Math.min(index, state.answers.functions.length - 1)].id;
-  } else return;
-  persist(); renderFunctions(); syncUI();
-  byId(`function-name-${focusId}`).focus({ preventScroll: true });
-  byId(`function-name-${focusId}`).scrollIntoView({ block: 'nearest', behavior: 'instant' });
+  if (target.dataset.action !== 'remove-function') return;
+  const index = state.answers.functions.findIndex(item => item.id === target.dataset.functionId);
+  if (index < 0) return;
+  state.answers.functions.splice(index, 1);
+  if (!state.answers.functions.length) state.answers.functions.push(newFunction());
+  ensureBlankFunction(); renderFunctions(); persist(); syncUI();
 });
 form.addEventListener('submit', async event => {
   event.preventDefault();
@@ -230,4 +250,4 @@ form.addEventListener('submit', async event => {
     byId('submit-error').hidden = false;
   } finally { submitting = false; syncUI(); }
 });
-restoreFields(); syncUI(); persist();
+ensureBlankFunction(); restoreFields(); syncUI(); persist();
