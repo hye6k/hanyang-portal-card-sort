@@ -27,7 +27,7 @@ function readSort() {
       groups: review.groups.map(group => ({ id: group.id, name: group.name, card_ids: [...group.cardIds] })), ungrouped_card_ids: [...review.singles], description_views: copy(saved.descriptionViews || {}) };
   } catch { return null; }
 }
-const emptyAnswers = () => ({ difficult: [], difficult_none: false, difficult_reasons: {}, naming: [], naming_none: false, naming_reasons: {}, clarity: null, criterion: '', criterion_other: '', consent: false });
+const emptyAnswers = () => ({ difficult: [], difficult_none: false, difficult_reasons: {}, naming: [], naming_none: false, naming_reasons: {}, clarity: null, criterion: [], criterion_other: '', consent: false });
 const fresh = () => ({ version: VERSION, id: crypto.randomUUID(), startedAt: new Date().toISOString(), sort: readSort(), answers: emptyAnswers(), stage: 'select', scroll: {}, pending: null, done: false });
 let state = fresh(), submitting = false;
 try {
@@ -39,6 +39,7 @@ try {
   }
 } catch { /* Keep the draft in memory if session storage is unavailable. */ }
 state.answers = { ...emptyAnswers(), ...state.answers }; state.scroll ||= {};
+if (!Array.isArray(state.answers.criterion)) state.answers.criterion = state.answers.criterion ? [state.answers.criterion] : [];
 for (const kind of ['difficult', 'naming']) {
   state.answers[kind] = state.answers[kind].filter(id => cards.some(card => card.id === id));
   state.answers[kind].forEach(id => { state.answers[`${kind}_reasons`][id] ||= { selected: [], other: '' }; });
@@ -61,7 +62,7 @@ function renderSelection() {
   byId('sort-selection').innerHTML = groups.map(group => `<section class="selection-group${group.ungrouped ? ' selection-ungrouped' : ''}"><div class="selection-columns"><h3>${esc(group.name)}</h3><span aria-hidden="true">분류가<br>애매함</span><span aria-hidden="true">명칭이<br>어려움</span></div><div class="selection-grid">${group.ids.map(id => `<article class="selection-card" data-menu="${id}"><p>${esc(cardName(id))}</p><label class="selection-check"><input type="checkbox" data-card-kind="difficult" value="${id}" aria-label="${esc(cardName(id))}: 분류가 애매함"></label><label class="selection-check"><input type="checkbox" data-card-kind="naming" value="${id}" aria-label="${esc(cardName(id))}: 명칭이 어려움"></label></article>`).join('')}</div></section>`).join('');
 }
 byId('clarity-options').innerHTML = clarityLabels.map((label, i) => `<label class="scale-option"><input type="radio" name="clarity" value="${i + 1}"><span class="scale-number">${i + 1}</span><span class="scale-label">${esc(label)}</span></label>`).join('');
-byId('criterion-options').innerHTML = criteria.map(([value, label]) => `<label class="choice"><input type="radio" name="criterion" value="${value}"><span>${esc(label)}</span></label>`).join('');
+byId('criterion-options').innerHTML = criteria.map(([value, label]) => `<label class="choice"><input type="checkbox" name="criterion" value="${value}"><span>${esc(label)}</span></label>`).join('');
 function reasonMarkup(kind, id) {
   const answer = state.answers[`${kind}_reasons`][id] || { selected: [], other: '' };
   return `<fieldset class="flow-reason" data-reason-kind="${kind}" data-card-id="${id}" data-question="${kind}-${id}" aria-labelledby="title-${kind}-${id}" aria-describedby="${kind}-${id}-error"><legend class="sr-only">${esc(cardName(id))}의 이유</legend><h4 id="title-${kind}-${id}">${kind === 'difficult' ? '분류하기 애매했던 이유는 무엇인가요?' : '명칭을 이해하기 어려웠던 이유는 무엇인가요?'}</h4><div class="options">${reasons[kind].map(([value, label]) => `<label class="choice"><input type="checkbox" data-reason value="${value}" ${answer.selected.includes(value) ? 'checked' : ''}><span>${esc(label)}</span></label>`).join('')}</div><div class="other-field" data-other-field hidden><label for="other-${kind}-${id}">기타 이유</label><textarea id="other-${kind}-${id}" data-other rows="3" maxlength="800" placeholder="이유를 간단히 입력해 주세요." aria-describedby="${kind}-${id}-error">${esc(answer.other)}</textarea></div><p class="field-error" id="${kind}-${id}-error" hidden></p></fieldset>`;
@@ -86,7 +87,8 @@ function syncReasonBlocks() {
   byId('menu-reasons-section').hidden = !selected.length;
 }
 function restoreFields() {
-  for (const name of ['clarity', 'criterion']) form.querySelectorAll(`[name="${name}"]`).forEach(el => { el.checked = el.value === String(state.answers[name] || ''); });
+  for (const name of ['clarity']) form.querySelectorAll(`[name="${name}"]`).forEach(el => { el.checked = el.value === String(state.answers[name] || ''); });
+  form.querySelectorAll('[name=criterion]').forEach(el => { el.checked = state.answers.criterion.includes(el.value); });
   byId('criterion-other').value = state.answers.criterion_other; form.elements.namedItem('consent').checked = state.answers.consent;
 }
 function readAnswers() {
@@ -97,7 +99,7 @@ function readAnswers() {
     form.querySelectorAll(`[data-reason-kind="${kind}"]`).forEach(block => { a[`${kind}_reasons`][block.dataset.cardId] = { selected: [...block.querySelectorAll('[data-reason]:checked')].map(el => el.value), other: block.querySelector('[data-other]').value }; });
     a[kind].forEach(id => { a[`${kind}_reasons`][id] ||= { selected: [], other: '' }; });
   }
-  a.clarity = Number(form.querySelector('[name="clarity"]:checked')?.value) || null; a.criterion = form.querySelector('[name="criterion"]:checked')?.value || ''; a.criterion_other = byId('criterion-other').value; a.consent = form.elements.namedItem('consent').checked;
+  a.clarity = Number(form.querySelector('[name="clarity"]:checked')?.value) || null; a.criterion = [...form.querySelectorAll('[name="criterion"]:checked')].map(el => el.value); a.criterion_other = byId('criterion-other').value; a.consent = form.elements.namedItem('consent').checked;
   return a;
 }
 function questionErrors() {
@@ -108,8 +110,8 @@ function questionErrors() {
     else if (answer.selected.includes('other') && !answer.other.trim()) errors.push([`${kind}-${id}`, '이 메뉴의 기타 이유를 입력해 주세요.']);
   }
   if (![1, 2, 3, 4, 5].includes(a.clarity)) errors.push(['clarity', '명칭으로 기능을 이해할 수 있었던 정도를 선택해 주세요.']);
-  if (!criteria.some(([value]) => value === a.criterion)) errors.push(['criterion', '가장 중요하게 생각한 분류 기준을 선택해 주세요.']);
-  else if (a.criterion === 'other' && !a.criterion_other.trim()) errors.push(['criterion', '기타 기준을 입력해 주세요.']);
+  if (!a.criterion.length || a.criterion.some(item => !criteria.some(([value]) => value === item))) errors.push(['criterion', '고려한 분류 기준을 하나 이상 선택해 주세요.']);
+  else if (a.criterion.includes('other') && !a.criterion_other.trim()) errors.push(['criterion', '기타 기준을 입력해 주세요.']);
   if (!a.consent) errors.push(['consent', '응답 제출에 동의해 주세요.']);
   return errors;
 }
@@ -135,7 +137,7 @@ function syncUI() {
   byId('submit-button').hidden = !questions; byId('submit-button').disabled = submitting;
   byId('submit-button').textContent = submitting ? '저장 중…' : state.pending ? '다시 제출' : '최종 제출';
   byId('edit-groups').disabled = frozen; byId('edit-groups').textContent = state.sort ? '← 그룹 수정' : '← 카드 분류 시작';
-  byId('criterion-other-field').hidden = state.answers.criterion !== 'other'; byId('criterion-other').disabled = state.answers.criterion !== 'other';
+  byId('criterion-other-field').hidden = !state.answers.criterion.includes('other'); byId('criterion-other').disabled = !state.answers.criterion.includes('other');
   byId('pending-note').hidden = !state.pending || submitting;
   byId('page-title').textContent = state.done ? '제출 완료' : questions ? '분류 후 질문' : '애매했던 메뉴 선택'; document.title = byId('page-title').textContent;
   document.querySelectorAll('[data-step]').forEach(el => { if (el.dataset.step === state.stage) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current'); });
@@ -143,7 +145,7 @@ function syncUI() {
   if (!form.querySelector('[data-invalid]')) byId('validation-summary').hidden = true;
 }
 function saveCurrent() { if (!state.pending && !state.done) state.answers = readAnswers(); state.scroll[state.stage] = scrollY; persist(); }
-function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-6'); url.searchParams.delete('from'); return url.pathname + url.search; }
+function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-7'); url.searchParams.delete('from'); return url.pathname + url.search; }
 function showStage(stage, push = true) {
   saveCurrent(); state.stage = stage; persist();
   if (push) history.pushState({ stage }, '', stageUrl(stage));
@@ -162,7 +164,7 @@ form.addEventListener('input', event => {
 });
 function buildRecord() {
   const a = state.answers, answersFor = kind => a[kind].map(id => ({ card_id: id, reasons: [...a[`${kind}_reasons`][id].selected], other: a[`${kind}_reasons`][id].selected.includes('other') ? a[`${kind}_reasons`][id].other.trim() : null }));
-  return { id: state.id, study_version: VERSION, is_test: true, payload: { schema_version: 2, kind: 'portal_post_sort_survey', study_mode: 'pilot', workflow: 'sort-select-questions-v1', consent: a.consent, cards: copy(cards), sort_result: copy(state.sort), answers: { difficult_none: a.difficult_none, difficult_cards: answersFor('difficult'), label_comprehension: a.clarity, naming_none: a.naming_none, naming_difficult_cards: answersFor('naming'), grouping_criterion: a.criterion, grouping_criterion_other: a.criterion === 'other' ? a.criterion_other.trim() : null }, questionnaire: { sorting_reasons: Object.fromEntries(reasons.difficult), naming_reasons: Object.fromEntries(reasons.naming), label_comprehension_scale: Object.fromEntries(clarityLabels.map((label, i) => [i + 1, label])), grouping_criteria: Object.fromEntries(criteria) }, started_at: state.startedAt, submitted_at_client: new Date().toISOString() } };
+  return { id: state.id, study_version: VERSION, is_test: true, payload: { schema_version: 3, kind: 'portal_post_sort_survey', study_mode: 'pilot', workflow: 'sort-select-questions-v1', consent: a.consent, cards: copy(cards), sort_result: copy(state.sort), answers: { difficult_none: a.difficult_none, difficult_cards: answersFor('difficult'), label_comprehension: a.clarity, naming_none: a.naming_none, naming_difficult_cards: answersFor('naming'), grouping_criteria: [...a.criterion], grouping_criterion_other: a.criterion.includes('other') ? a.criterion_other.trim() : null }, questionnaire: { sorting_reasons: Object.fromEntries(reasons.difficult), naming_reasons: Object.fromEntries(reasons.naming), label_comprehension_scale: Object.fromEntries(clarityLabels.map((label, i) => [i + 1, label])), grouping_criteria: Object.fromEntries(criteria) }, started_at: state.startedAt, submitted_at_client: new Date().toISOString() } };
 }
 form.addEventListener('submit', async event => {
   event.preventDefault(); if (submitting || state.done) return;
