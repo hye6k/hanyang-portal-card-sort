@@ -143,7 +143,7 @@ function syncUI() {
   if (!form.querySelector('[data-invalid]')) byId('validation-summary').hidden = true;
 }
 function saveCurrent() { if (!state.pending && !state.done) state.answers = readAnswers(); state.scroll[state.stage] = scrollY; persist(); }
-function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-5'); url.searchParams.delete('from'); return url.pathname + url.search; }
+function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-6'); url.searchParams.delete('from'); return url.pathname + url.search; }
 function showStage(stage, push = true) {
   saveCurrent(); state.stage = stage; persist();
   if (push) history.pushState({ stage }, '', stageUrl(stage));
