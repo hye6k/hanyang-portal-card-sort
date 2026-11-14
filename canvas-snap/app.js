@@ -6,7 +6,6 @@ const viewport = document.querySelector('#viewport');
 const world = document.querySelector('#world');
 const cardsElement = document.querySelector('#cards');
 const outlines = document.querySelector('#outlines');
-const snapGuide = document.querySelector('#snap-guide');
 const reviewDialog = document.querySelector('#review');
 const hint = document.querySelector('#hint');
 const storageKey = 'hyu-spatial-card-sort-snap-v1';
@@ -120,10 +119,15 @@ function paint() {
     const inGroup = gesture?.type === 'group' && gesture.ids.includes(card.id);
     el.classList.toggle('moving', isCardGesture() && gesture.moved && (gesture.id === card.id || inGroup));
     el.classList.toggle('group-held', inGroup);
-    el.classList.toggle('magnet-target', !!snap?.targetIds.includes(card.id));
   }
   drawOutlines();
-  drawSnapGuide(snap);
+  let outlinedTarget = false;
+  for (const outline of outlines.querySelectorAll('.group-outline')) {
+    const target = !!snap && outline.dataset.cards.split(',').includes(snap.targetIds[0]) && !outline.classList.contains('group-held');
+    outline.classList.toggle('magnet-group', target);
+    outlinedTarget ||= target;
+  }
+  for (const el of cardsElement.querySelectorAll('.card')) el.classList.toggle('magnet-target', !!snap && !outlinedTarget && snap.targetIds.includes(el.dataset.id));
   updateControls();
 }
 
@@ -277,13 +281,6 @@ function makeSnapPlan() {
     }
   }
   return null;
-}
-function drawSnapGuide(plan) {
-  if (!plan) { snapGuide.innerHTML = ''; return; }
-  snapGuide.innerHTML = `<svg width="1" height="1">${plan.activeIds.map(id => {
-    const p = plan.placements[id];
-    return `<rect x="${p.x}" y="${p.y}" width="${CARD_W}" height="${CARD_H}" rx="9"/>`;
-  }).join('')}</svg>`;
 }
 function applySnap(plan) {
   for (const id of plan.ids) Object.assign(state.positions[id], plan.placements[id]);

@@ -22,4 +22,4 @@
 
 .reset-test{position:fixed;right:12px;bottom:calc(17px + env(safe-area-inset-bottom));z-index:45;min-height:32px;padding:6px 10px;border:1px solid #d4e0e9;border-radius:7px;background:#f8fafcee;color:#7890a2;font-size:10px;line-height:1.6}.reset-test:hover{background:#fff;color:#426983;border-color:#aec6d6}@media(max-width:700px){.reset-test{right:10px;bottom:calc(88px + env(safe-area-inset-bottom));min-height:36px;padding:7px 10px}}
 
-#snap-guide{position:absolute;left:0;top:0;width:0;height:0;z-index:2;pointer-events:none}#snap-guide svg{position:absolute;inset:0;overflow:visible;pointer-events:none}#snap-guide rect{fill:rgb(77 155 190 / 12%);stroke:#357e9e;stroke-width:var(--group-stroke,2px);stroke-dasharray:6 4}.card.magnet-target{border-color:#438fab;box-shadow:0 0 0 2px #7eb6cf44}.card.snap-settling{transition:transform .15s ease-out}
+.card.magnet-target{border-color:#438fab;box-shadow:0 0 0 2px #7eb6cf44}.card.snap-settling{transition:transform .15s ease-out}.group-outline.magnet-group path{stroke:#286f90;stroke-width:var(--held-stroke,3.2px);fill:rgb(100 171 207 / 27%)}
