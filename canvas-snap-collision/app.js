@@ -117,6 +117,7 @@ function refreshSingles() {
 function commitCardMove(id, snap) {
   const review = ensureGroups();
   const source = review.groups.find(group => group.cardIds.includes(id));
+  const sourceSize = source?.cardIds.length || 0;
   const target = snap?.targetGroupId ? review.groups.find(group => group.id === snap.targetGroupId) : null;
   if (snap) {
     if (source && source !== target) source.cardIds = source.cardIds.filter(member => member !== id);
@@ -136,6 +137,7 @@ function commitCardMove(id, snap) {
     if (!stillInside) source.cardIds = source.cardIds.filter(member => member !== id);
   }
   refreshSingles();
+  if (source?.cardIds.length && source.cardIds.length < sourceSize) arrangeRemainingGroup(source);
 }
 function invalidate() { state.confirmed = false; drawOutlines(); updateControls(); }
 function updateControls() {
@@ -338,6 +340,17 @@ function chooseGrid(count) {
   const cols = stages.find(([limit]) => count <= limit)[1];
   const rows = Math.ceil(count / cols);
   return { cols, rows, width: cols * CARD_W + (cols - 1) * SNAP_GAP, height: rows * CARD_H + (rows - 1) * SNAP_GAP };
+}
+function arrangeRemainingGroup(group) {
+  if (group.cardIds.length < 2) return;
+  const ids = [...group.cardIds].sort((a, b) => state.positions[a].y - state.positions[b].y || state.positions[a].x - state.positions[b].x);
+  const grid = chooseGrid(ids.length), origin = arrangementOrigin(grid, ids);
+  if (!origin) return;
+  ids.forEach((id, i) => {
+    state.positions[id].x = origin.x + (i % grid.cols) * (CARD_W + SNAP_GAP);
+    state.positions[id].y = origin.y + Math.floor(i / grid.cols) * (CARD_H + SNAP_GAP);
+  });
+  animateArrangement(ids);
 }
 function arrangementOrigin(grid, ids) {
   const members = new Set(ids), points = ids.map(id => state.positions[id]);
