@@ -8,22 +8,19 @@
   <meta name="description" content="한양대학교 포털 이용 경험에 대한 간단한 설문이다.">
   <title>포털 이용 경험 조사</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=survey-1">
+  <link rel="stylesheet" href="./style.css?v=survey-2">
 </head>
 <body>
   <a class="skip-link" href="#survey-form">설문으로 이동</a>
   <main class="page">
     <header class="page-heading">
-      <div class="heading-top"><p class="eyebrow">한양대학교 · 인간공학과실습</p><span class="pilot-badge">시범 설문</span></div>
       <h1>포털 이용 경험 조사</h1>
-      <p class="intro">현재 사용 중인 한양대학교 포털을 떠올리며 응답한다.</p>
-      <p class="test-note">이 페이지의 제출 내용은 시험 응답으로 저장된다.</p>
     </header>
     <form id="survey-form" novalidate>
       <fieldset id="response-fields" class="response-fields">
         <legend class="sr-only">포털 이용 경험 설문</legend>
         <section class="question" data-question="participant" aria-labelledby="participant-title">
-          <div class="question-heading"><h2 id="participant-title"><span class="question-number">01</span>기본정보</h2><span class="question-type">단답형</span></div>
+          <div class="question-heading"><h2 id="participant-title"><span class="question-number">01</span>기본정보</h2></div>
           <div class="identity-fields">
             <label for="student-number">학번<input id="student-number" name="student_number" type="text" inputmode="numeric" autocomplete="off" maxlength="24" required aria-describedby="participant-error"></label>
             <label for="department">학과<input id="department" name="department" type="text" autocomplete="off" maxlength="80" required aria-describedby="participant-error"></label>
@@ -32,17 +29,17 @@
           <p class="field-error" id="participant-error" hidden></p>
         </section>
         <section class="question" data-question="frequency" aria-labelledby="frequency-title">
-          <div class="question-heading"><h2 id="frequency-title"><span class="question-number">02</span>한양대학교 포털을 얼마나 자주 사용하는가?</h2><span class="question-type">하나 선택</span></div>
+          <div class="question-heading"><h2 id="frequency-title"><span class="question-number">02</span>한양대학교 포털을 얼마나 자주 사용하는가?</h2></div>
           <fieldset class="options" id="frequency-options" aria-labelledby="frequency-title" aria-describedby="frequency-error"><legend class="sr-only">포털 이용 빈도</legend></fieldset>
           <p class="field-error" id="frequency-error" hidden></p>
         </section>
         <section class="question" data-question="difficulty" aria-labelledby="difficulty-title">
-          <div class="question-heading"><h2 id="difficulty-title"><span class="question-number">03</span>원하는 메뉴를 찾는 데 어려움을 겪은 경험이 있는가?</h2><span class="question-type">하나 선택</span></div>
+          <div class="question-heading"><h2 id="difficulty-title"><span class="question-number">03</span>원하는 메뉴를 찾는 데 어려움을 겪은 경험이 있는가?</h2></div>
           <fieldset class="scale" id="difficulty-options" aria-labelledby="difficulty-title" aria-describedby="difficulty-error"><legend class="sr-only">탐색 어려움의 빈도</legend></fieldset>
           <p class="field-error" id="difficulty-error" hidden></p>
         </section>
         <section class="question" data-question="hardest" aria-labelledby="hardest-title">
-          <div class="question-heading"><h2 id="hardest-title"><span class="question-number">04</span>찾기 가장 어려웠던 기능은 무엇인가?</h2><span class="question-type">단답형</span></div>
+          <div class="question-heading"><h2 id="hardest-title"><span class="question-number">04</span>찾기 가장 어려웠던 기능은 무엇인가?</h2></div>
           <p class="not-applicable" id="hardest-skipped" hidden>앞선 문항에서 어려움을 겪은 적이 없다고 응답하여 해당 없음 처리된다.</p>
           <fieldset id="hardest-fields" class="conditional-fields" aria-labelledby="hardest-title" aria-describedby="hardest-error"><legend class="sr-only">찾기 어려웠던 기능</legend>
             <label class="sr-only" for="hardest-function">찾기 가장 어려웠던 기능명</label><input id="hardest-function" name="hardest_function" type="text" maxlength="200" placeholder="찾으려 했던 기능명을 입력한다." aria-describedby="hardest-error">
@@ -51,7 +48,7 @@
           <p class="field-error" id="hardest-error" hidden></p>
         </section>
         <section class="question" data-question="reasons" aria-labelledby="reasons-title">
-          <div class="question-heading"><h2 id="reasons-title"><span class="question-number">05</span>해당 기능을 찾기 어려웠던 이유는 무엇인가?</h2><span class="question-type">여러 개 선택</span></div>
+          <div class="question-heading"><h2 id="reasons-title"><span class="question-number">05</span>해당 기능을 찾기 어려웠던 이유는 무엇인가?</h2></div>
           <p class="not-applicable" id="reasons-skipped" hidden>앞선 문항에서 어려움을 겪은 적이 없다고 응답하여 해당 없음 처리된다.</p>
           <fieldset id="reasons-fields" class="conditional-fields" aria-labelledby="reasons-title" aria-describedby="reasons-error"><legend class="sr-only">탐색이 어려웠던 이유</legend>
             <div class="options" id="reason-options"></div>
@@ -60,26 +57,25 @@
           <p class="field-error" id="reasons-error" hidden></p>
         </section>
         <section class="question" data-question="ease" aria-labelledby="ease-title">
-          <div class="question-heading"><h2 id="ease-title"><span class="question-number">06</span>현재 포털에서 원하는 기능을 쉽게 찾을 수 있다고 생각하는가?</h2><span class="question-type">하나 선택</span></div>
+          <div class="question-heading"><h2 id="ease-title"><span class="question-number">06</span>현재 포털에서 원하는 기능을 쉽게 찾을 수 있다고 생각하는가?</h2></div>
           <fieldset class="scale" id="ease-options" aria-labelledby="ease-title" aria-describedby="ease-error"><legend class="sr-only">주관적 탐색 용이성</legend></fieldset>
           <p class="field-error" id="ease-error" hidden></p>
         </section>
         <section class="consent-area" data-question="consent">
-          <p>학번·학과·이름은 참가자 관리와 후속 실험의 중복 참여 확인에, 이용 경험 응답은 포털 메뉴 연구에 사용한다.</p>
-          <label class="check-option consent-option"><input type="checkbox" name="consent" required aria-describedby="consent-error"><span>위 내용을 확인했으며 정보 수집과 응답 제출에 동의한다.</span></label>
+          <p>학번·학과·이름은 참가자 관리와 후속 실험의 중복 참여 확인에, 이용 경험 응답은 포털 메뉴 연구에 사용합니다.</p>
+          <label class="check-option consent-option"><input type="checkbox" name="consent" required aria-describedby="consent-error"><span>위 내용을 확인했으며 정보 수집과 응답 제출에 동의합니다.</span></label>
           <p class="field-error" id="consent-error" hidden></p>
         </section>
       </fieldset>
       <p id="validation-summary" class="validation-summary" role="alert" hidden></p>
       <p id="pending-note" class="pending-note" hidden>전송할 응답을 보관 중이다. 다시 제출하면 같은 내용으로 재시도한다.</p>
       <p id="submit-error" class="submit-error" role="alert" hidden></p>
-      <div class="submit-bar"><div class="completion"><span><b id="answered-count">0</b> / 6개 응답</span><span id="save-note" class="save-note">작성 내용은 이 탭에 임시 저장된다.</span></div><button id="submit-button" class="primary-button" type="submit">응답 제출</button></div>
+      <div class="submit-bar"><button id="submit-button" class="primary-button" type="submit">응답 제출</button></div>
     </form>
     <section class="complete-panel" id="complete-panel" aria-labelledby="complete-title" hidden><span class="complete-check" aria-hidden="true">✓</span><h2 id="complete-title" tabindex="-1">응답이 저장되었다.</h2><p>참여에 감사한다.<br>이 창을 닫아도 된다.</p><span class="complete-note">시험 응답으로 구분해 저장했다.</span></section>
-    <footer class="page-footer"><span>한양대학교 인간공학과실습 팀프로젝트</span><button type="button" id="reset-button">작성 내용 초기화</button></footer>
   </main>
   <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <noscript>응답하려면 브라우저에서 JavaScript를 허용해야 한다.</noscript>
-  <script type="module" src="./app.js?v=survey-1"></script>
+  <script type="module" src="./app.js?v=survey-2"></script>
 </body>
 </html>

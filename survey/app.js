@@ -19,21 +19,19 @@ const reasonOptions = [
 const form = document.querySelector('#survey-form');
 const fields = document.querySelector('#response-fields');
 const button = document.querySelector('#submit-button');
-const reset = document.querySelector('#reset-button');
 const byId = id => document.getElementById(id);
 const named = name => form.elements.namedItem(name);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fresh = () => ({ version: VERSION, id: crypto.randomUUID(), startedAt: new Date().toISOString(), answers: {}, pending: null, done: false });
 let state = fresh();
-let storageAvailable = true;
 let submitting = false;
 try {
   const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null');
   if (saved?.version === VERSION && saved.answers && typeof saved.id === 'string') state = saved;
-} catch { storageAvailable = false; }
+} catch { /* Keep the draft in memory if session storage is unavailable. */ }
 function persist() {
   try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-  catch { storageAvailable = false; }
+  catch { /* Keep the draft in memory if session storage is unavailable. */ }
 }
 function radioOptions(name, list, scale = false) {
   return list.map(([value, label]) => `<label class="${scale ? 'scale-option' : 'choice'}"><input type="radio" name="${name}" value="${value}" required>${scale ? `<span class="scale-number">${value}</span><span class="scale-label">${esc(label)}</span>` : `<span>${esc(label)}</span>`}</label>`).join('');
@@ -118,12 +116,7 @@ function syncUI() {
   named('hardest_function').disabled = noDifficulty || !!a.cannot_recall;
   byId('other-field').hidden = !a.reasons?.includes('other');
   named('other_reason').disabled = noDifficulty || !a.reasons?.includes('other');
-  const validKeys = new Set(errorsFor({ ...a, consent: true }).map(([key]) => key));
-  byId('answered-count').textContent = 6 - validKeys.size;
-  byId('save-note').textContent = storageAvailable ? '작성 내용은 이 탭에 임시 저장된다.' : '이 탭을 유지하면 작성을 이어갈 수 있다.';
   byId('pending-note').hidden = !state.pending || submitting;
-  reset.disabled = frozen;
-  reset.textContent = state.done ? '새 시험 응답 작성' : '작성 내용 초기화';
   button.disabled = submitting;
   button.textContent = submitting ? '저장 중…' : state.pending ? '다시 제출' : '응답 제출';
   form.hidden = state.done;
@@ -192,12 +185,5 @@ form.addEventListener('submit', async event => {
     byId('submit-error').textContent = '저장 완료를 확인하지 못했다. 연결 상태를 확인한 뒤 다시 제출하면 된다. 작성한 응답은 유지된다.';
     byId('submit-error').hidden = false;
   } finally { submitting = false; syncUI(); }
-});
-reset.addEventListener('click', () => {
-  if (state.pending || submitting) return;
-  state = fresh(); persist(); form.reset(); restoreFields();
-  form.querySelectorAll('[data-question]').forEach(el => clearError(el.dataset.question));
-  byId('submit-error').hidden = true;
-  syncUI(); window.scrollTo({ top: 0, behavior: 'instant' });
 });
 restoreFields(); syncUI(); persist();
