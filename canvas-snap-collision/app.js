@@ -1,3 +1,4 @@
+import { integrated, urls } from '../study/flow.js?v=journey-1';
 import { cardNames } from '../test/cards.js';
 
 const CARD_W = 144, CARD_H = 70, GAP = 24;
@@ -56,9 +57,10 @@ function overviewView(positions) {
   const left = Math.min(...points.map(p => p.x)), top = Math.min(...points.map(p => p.y));
   const width = Math.max(...points.map(p => p.x + CARD_W)) - left;
   const height = Math.max(...points.map(p => p.y + CARD_H)) - top;
-  const availableHeight = Math.max(1, innerHeight - 84);
+  const headerHeight = integrated ? 49 : 0;
+  const availableHeight = Math.max(1, innerHeight - 84 - headerHeight);
   const scale = clamp(Math.min((innerWidth - 32) / width, (availableHeight - 32) / height), 0.01, 1.5);
-  return { scale, x: (innerWidth - width * scale) / 2 - left * scale, y: (availableHeight - height * scale) / 2 - top * scale };
+  return { scale, x: (innerWidth - width * scale) / 2 - left * scale, y: headerHeight + (availableHeight - height * scale) / 2 - top * scale };
 }
 function initial(existingOrder) {
   const cols = 5, rows = Math.ceil(catalog.length / cols);
@@ -794,7 +796,7 @@ document.addEventListener('click', event => {
     future = [];
     state.confirmed = true; state.confirmedAt = new Date().toISOString();
     reviewDialog.close(); drawOutlines(); updateControls(); save();
-    location.assign('../post-survey/?stage=select&from=canvas&v=flow-1');
+    location.assign(integrated ? urls['post-1'] : '../post-survey/?stage=select&from=canvas&v=flow-8');
   }
 });
 reviewDialog.addEventListener('input', event => {

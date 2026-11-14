@@ -1,8 +1,9 @@
+import { integrated, urls } from '../study/flow.js?v=journey-1';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
 
 const VERSION = 'portal-experience-survey-2026-11-14-v2';
-const STORAGE_KEY = `hyu-portal-survey:${VERSION}`;
+const STORAGE_KEY = `hyu-portal-survey:${VERSION}${integrated ? ':study' : ''}`;
 const LEGACY_KEY = 'hyu-portal-survey:portal-experience-survey-2026-11-14-v1';
 const IS_TEST = true;
 const frequencyOptions = [
@@ -31,13 +32,14 @@ try {
   if (saved?.version === VERSION && saved.answers && typeof saved.id === 'string') state = saved;
   else {
     const legacy = JSON.parse(sessionStorage.getItem(LEGACY_KEY) || 'null');
-    if (legacy?.answers && !legacy.done && typeof legacy.id === 'string') {
+    if (!integrated && legacy?.answers && !legacy.done && typeof legacy.id === 'string') {
       const a = legacy.answers;
       state = { ...legacy, version: VERSION, answers: { ...a, functions: [{ ...newFunction(), name: a.hardest_function || '', reasons: a.reasons || [], other_reason: a.other_reason || '' }] } };
       // A frozen legacy request must retain its original UUID and body on retry.
     }
   }
 } catch { /* Keep the draft in memory if session storage is unavailable. */ }
+if (integrated && state.done) { state.done = false; state.id = crypto.randomUUID(); }
 const seenIds = new Set();
 state.answers.functions = (Array.isArray(state.answers.functions) && state.answers.functions.length ? state.answers.functions : [newFunction()]).map(item => {
   const id = typeof item.id === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(item.id) && !seenIds.has(item.id) ? item.id : crypto.randomUUID();
@@ -177,7 +179,7 @@ function syncUI() {
   }
   byId('pending-note').hidden = !state.pending || submitting;
   button.disabled = submitting;
-  button.textContent = submitting ? '저장 중…' : state.pending ? '다시 제출' : '응답 제출';
+  button.textContent = submitting ? '저장 중…' : state.pending ? '다시 제출' : integrated ? '다음' : '응답 제출';
   form.hidden = state.done; byId('complete-panel').hidden = !state.done;
 }
 function buildRecord(a) {
@@ -232,6 +234,7 @@ form.addEventListener('submit', async event => {
     state.answers = readFields();
     const errors = errorsFor(state.answers);
     if (errors.length) { showErrors(errors); return; }
+    if (integrated) { sessionStorage.setItem('hyu-study-pre', JSON.stringify(buildRecord(state.answers))); persist(); location.assign(form.dataset.destination || urls.cards); return; }
     state.pending = buildRecord(state.answers); persist();
   }
   submitting = true; byId('submit-error').hidden = true; byId('validation-summary').hidden = true; syncUI();
@@ -247,3 +250,5 @@ form.addEventListener('submit', async event => {
   } finally { submitting = false; syncUI(); }
 });
 ensureBlankFunction(); restoreFields(); syncUI(); persist();
+
+window.addEventListener('pagehide', () => { if (!state.pending && !state.done) { state.answers = readFields(); persist(); } });

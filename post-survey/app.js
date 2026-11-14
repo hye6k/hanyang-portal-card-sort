@@ -1,9 +1,10 @@
+import { integrated, urls, updateFlow } from '../study/flow.js?v=journey-1';
 import { cardNames } from '../test/cards.js';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
 
 const VERSION = 'portal-post-sort-survey-2026-11-14-v2';
-const STORAGE_KEY = `hyu-post-sort-survey:${VERSION}`;
+const STORAGE_KEY = `hyu-post-sort-survey:${VERSION}${integrated ? ':study' : ''}`;
 const LEGACY_KEY = 'hyu-post-sort-survey:portal-post-sort-survey-2026-11-14-v1';
 const SORT_KEY = 'hyu-spatial-card-sort-snap-collision-v1';
 const cards = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name }));
@@ -35,7 +36,7 @@ try {
   if (saved?.version === VERSION && saved.answers && typeof saved.id === 'string') state = saved;
   else {
     const legacy = JSON.parse(sessionStorage.getItem(LEGACY_KEY) || 'null');
-    if (legacy?.answers && !legacy.done && typeof legacy.id === 'string') state = { ...legacy, version: VERSION, stage: legacy.pending ? 'questions' : 'select', scroll: {} };
+    if (!integrated && legacy?.answers && !legacy.done && typeof legacy.id === 'string') state = { ...legacy, version: VERSION, stage: legacy.pending ? 'questions' : 'select', scroll: {} };
   }
 } catch { /* Keep the draft in memory if session storage is unavailable. */ }
 state.answers = { ...emptyAnswers(), ...state.answers }; state.scroll ||= {};
@@ -128,34 +129,35 @@ function showErrors(errors) {
 }
 function syncUI() {
   const frozen = submitting || !!state.pending, questions = state.stage === 'questions';
+  updateFlow(questions ? 'post-2' : 'post-1', frozen || state.done);
   byId('response-fields').disabled = frozen;
   syncReasonBlocks();
   for (const kind of ['difficult', 'naming']) form.querySelectorAll(`[data-card-kind="${kind}"]`).forEach(el => { el.checked = state.answers[kind].includes(el.value); el.disabled = false; });
   byId('selection-panel').hidden = questions; byId('questions-panel').hidden = !questions;
-  byId('back-selection').hidden = !questions; byId('back-selection').disabled = frozen;
+  byId('back-selection').hidden = !questions && !integrated; byId('back-selection').disabled = frozen; byId('back-selection').textContent = integrated ? '이전' : '← 선택 수정';
   byId('next-questions').hidden = questions; byId('next-questions').disabled = !state.sort || frozen;
   byId('submit-button').hidden = !questions; byId('submit-button').disabled = submitting;
   byId('submit-button').textContent = submitting ? '저장 중…' : state.pending ? '다시 제출' : '최종 제출';
   byId('edit-groups').disabled = frozen; byId('edit-groups').textContent = state.sort ? '← 그룹 수정' : '← 카드 분류 시작';
   byId('criterion-other-field').hidden = !state.answers.criterion.includes('other'); byId('criterion-other').disabled = !state.answers.criterion.includes('other');
   byId('pending-note').hidden = !state.pending || submitting;
-  byId('page-title').textContent = state.done ? '제출 완료' : questions ? '분류 후 질문' : '애매했던 메뉴 선택'; document.title = byId('page-title').textContent;
+  byId('page-title').textContent = state.done ? '제출 완료' : questions ? '어려웠던 이유와 분류 기준' : '분류하면서 어려웠던 메뉴'; document.title = byId('page-title').textContent;
   document.querySelectorAll('[data-step]').forEach(el => { if (el.dataset.step === state.stage) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current'); });
   form.hidden = state.done; byId('complete-panel').hidden = !state.done; byId('edit-groups').hidden = state.done;
   if (!form.querySelector('[data-invalid]')) byId('validation-summary').hidden = true;
 }
 function saveCurrent() { if (!state.pending && !state.done) state.answers = readAnswers(); state.scroll[state.stage] = scrollY; persist(); }
-function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-7'); url.searchParams.delete('from'); return url.pathname + url.search; }
+function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'flow-7'); url.searchParams.delete('from'); if (integrated) url.searchParams.set('step',stage === 'questions' ? 'post-2' : 'post-1'); return url.pathname + url.search; }
 function showStage(stage, push = true) {
   saveCurrent(); state.stage = stage; persist();
   if (push) history.pushState({ stage }, '', stageUrl(stage));
   form.querySelectorAll('[data-question]').forEach(el => clearError(el.dataset.question)); byId('submit-error').hidden = true; syncUI();
   requestAnimationFrame(() => { window.scrollTo({ top: state.scroll[stage] || 0, behavior: 'instant' }); byId('page-title').focus({ preventScroll: true }); });
 }
-function editGroups() { if (state.pending || state.done || submitting) return; saveCurrent(); location.assign('../canvas-snap-collision/?resume=post-survey&v=snap-collision-12'); }
+function editGroups() { if (state.pending || state.done || submitting) return; saveCurrent(); location.assign(integrated ? urls.cards : '../canvas-snap-collision/?resume=post-survey&v=snap-collision-12'); }
 byId('edit-groups').addEventListener('click', editGroups);
 byId('sort-selection').addEventListener('click', event => { if (event.target.closest('[data-start-sort]')) editGroups(); });
-byId('back-selection').addEventListener('click', () => { if (!state.pending && !submitting) showStage('select'); });
+byId('back-selection').addEventListener('click', () => { if (!state.pending && !submitting) { if (integrated && state.stage === 'select') editGroups(); else showStage('select'); } });
 byId('next-questions').addEventListener('click', () => { if (state.pending || submitting || !state.sort) return; state.answers = readAnswers(); showStage('questions'); });
 form.addEventListener('input', event => {
   if (state.pending || state.done || submitting) return;
@@ -164,11 +166,12 @@ form.addEventListener('input', event => {
 });
 function buildRecord() {
   const a = state.answers, answersFor = kind => a[kind].map(id => ({ card_id: id, reasons: [...a[`${kind}_reasons`][id].selected], other: a[`${kind}_reasons`][id].selected.includes('other') ? a[`${kind}_reasons`][id].other.trim() : null }));
-  return { id: state.id, study_version: VERSION, is_test: true, payload: { schema_version: 3, kind: 'portal_post_sort_survey', study_mode: 'pilot', workflow: 'sort-select-questions-v1', consent: a.consent, cards: copy(cards), sort_result: copy(state.sort), answers: { difficult_none: a.difficult_none, difficult_cards: answersFor('difficult'), label_comprehension: a.clarity, naming_none: a.naming_none, naming_difficult_cards: answersFor('naming'), grouping_criteria: [...a.criterion], grouping_criterion_other: a.criterion.includes('other') ? a.criterion_other.trim() : null }, questionnaire: { sorting_reasons: Object.fromEntries(reasons.difficult), naming_reasons: Object.fromEntries(reasons.naming), label_comprehension_scale: Object.fromEntries(clarityLabels.map((label, i) => [i + 1, label])), grouping_criteria: Object.fromEntries(criteria) }, started_at: state.startedAt, submitted_at_client: new Date().toISOString() } };
+  return { id: state.id, study_version: VERSION, is_test: true, payload: { schema_version: 3, kind: 'portal_post_sort_survey', study_mode: 'pilot', workflow: integrated ? 'pre-sort-post-v1' : 'sort-select-questions-v1', ...(integrated ? { pre_survey: JSON.parse(sessionStorage.getItem('hyu-study-pre') || 'null') } : {}), consent: a.consent, cards: copy(cards), sort_result: copy(state.sort), answers: { difficult_none: a.difficult_none, difficult_cards: answersFor('difficult'), label_comprehension: a.clarity, naming_none: a.naming_none, naming_difficult_cards: answersFor('naming'), grouping_criteria: [...a.criterion], grouping_criterion_other: a.criterion.includes('other') ? a.criterion_other.trim() : null }, questionnaire: { sorting_reasons: Object.fromEntries(reasons.difficult), naming_reasons: Object.fromEntries(reasons.naming), label_comprehension_scale: Object.fromEntries(clarityLabels.map((label, i) => [i + 1, label])), grouping_criteria: Object.fromEntries(criteria) }, started_at: state.startedAt, submitted_at_client: new Date().toISOString() } };
 }
 form.addEventListener('submit', async event => {
   event.preventDefault(); if (submitting || state.done) return;
   if (!state.pending) {
+    if (integrated && !sessionStorage.getItem('hyu-study-pre')) { location.assign(urls.pre); return; }
     state.answers = readAnswers();
     if (state.stage !== 'questions' || !state.sort) { showStage('select'); return; }
     const errors = questionErrors(); if (errors.length) { showErrors(errors); return; }
