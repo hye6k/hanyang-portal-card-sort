@@ -89,6 +89,10 @@ if (state && isUntouchedOldGrid(state)) {
   state = initial(order);
 }
 state ||= initial();
+if (state.groupTerminologyVersion !== 1) {
+  for (const group of state.review?.groups || []) group.name = group.name.replace(/^묶음 (\d+)$/, '그룹 $1');
+  state.groupTerminologyVersion = 1;
+}
 state.descriptionViews ||= {};
 state.view = overviewView(state.positions);
 const pointers = new Map();
@@ -116,7 +120,7 @@ function armGroupHold() {
     pending.type = 'group'; pending.ids = [...group.cardIds]; pending.groupName = group.name; pending.groupId = group.id; pending.groupTone = group.tone;
     pending.others = movementGroups(pending.ids);
     lastTap = null;
-    announce(`${pending.ids.length}개 묶음 선택`);
+    announce(`${pending.ids.length}개 그룹 선택`);
     paint();
   }, 500);
 }
@@ -161,7 +165,7 @@ function commitCardMove(id, snap) {
     else {
       const number = Math.max(review.nextGroup || 1, 1);
       review.nextGroup = number + 1;
-      review.groups.push({ id: crypto.randomUUID(), name: `묶음 ${number}`, tone: [0, 1, 2, 3].find(tone => !review.groups.some(group => group.tone === tone)) ?? number % 4, cardIds: [...snap.ids] });
+      review.groups.push({ id: crypto.randomUUID(), name: `그룹 ${number}`, tone: [0, 1, 2, 3].find(tone => !review.groups.some(group => group.tone === tone)) ?? number % 4, cardIds: [...snap.ids] });
     }
   } else if (source && source.cardIds.length > 1) {
     const p = state.positions[id];
@@ -179,7 +183,7 @@ function invalidate() { state.confirmed = false; drawOutlines(); updateControls(
 function updateControls() {
   document.querySelector('[data-action=undo]').disabled = !history.length;
   document.querySelector('[data-action=redo]').disabled = !future.length;
-  document.querySelector('[data-action=review]').textContent = state.confirmed ? '묶음 보기' : '묶음 확인';
+  document.querySelector('[data-action=review]').textContent = state.confirmed ? '그룹 보기' : '그룹 확인';
 }
 
 function positionCardDetail() {
@@ -215,7 +219,6 @@ function openCardDetail(id) {
   document.querySelector('#detail-description').textContent = card.description;
   document.querySelector('#single-group-form').hidden = true;
   document.querySelector('#single-group-name').value = '';
-  document.querySelector('#single-group-error').hidden = true;
   document.querySelector('#start-single-group').hidden = ensureGroups().groups.some(group => group.cardIds.includes(id));
   detailPanel.hidden = false; positionCardDetail();
   document.querySelector('#close-card-detail').focus({ preventScroll: true });
@@ -233,10 +236,12 @@ document.querySelector('#start-single-group').addEventListener('click', () => {
 document.querySelector('#single-group-form').addEventListener('submit', event => {
   event.preventDefault();
   if (!detailCardId || ensureGroups().groups.some(group => group.cardIds.includes(detailCardId))) return;
-  const input = document.querySelector('#single-group-name'), name = input.value.trim();
-  if (!name) { const error = document.querySelector('#single-group-error'); error.textContent = '그룹 이름을 입력해 주세요.'; error.hidden = false; positionCardDetail(); input.focus(); return; }
+  const requestedName = document.querySelector('#single-group-name').value.trim();
   remember(copy(state.positions));
-  const review = ensureGroups(), number = review.nextGroup || 1;
+  const review = ensureGroups();
+  let number = review.nextGroup || 1;
+  if (!requestedName) while (review.groups.some(group => group.name === `그룹 ${number}`)) number++;
+  const name = requestedName || `그룹 ${number}`;
   review.nextGroup = number + 1;
   review.groups.push({ id: crypto.randomUUID(), name, tone: [0, 1, 2, 3].find(tone => !review.groups.some(group => group.tone === tone)) ?? number % 4, cardIds: [detailCardId] });
   refreshSingles(); closeCardDetail(); invalidate(); paint(); save(); announce('한 장짜리 그룹을 만들었다.');
@@ -737,7 +742,7 @@ function inferGroups() {
   const groups = [], singles = [];
   for (const ids of spatialClusters()) {
     if (ids.length === 1) singles.push(ids[0]);
-    else groups.push({ id: crypto.randomUUID(), name: `묶음 ${groups.length + 1}`, cardIds: ids });
+    else groups.push({ id: crypto.randomUUID(), name: `그룹 ${groups.length + 1}`, cardIds: ids });
   }
   return { groups, singles, nextGroup: groups.length + 1, inferred: { groups: copy(groups), singles: [...singles] } };
 }
@@ -747,7 +752,7 @@ function reviewRows(ids) {
 }
 function renderReview() {
   const result = state.review;
-  reviewDialog.innerHTML = `<div class="review-heading"><h1>묶음 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group tone-${index % 4}"><div class="review-group-heading"><label><span class="sr-only">묶음 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="묶음 이름" maxlength="60" aria-label="${index + 1}번째 묶음 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">${state.confirmed ? '완료' : '확정'}</button></div>`;
+  reviewDialog.innerHTML = `<div class="review-heading"><h1>그룹 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group tone-${index % 4}"><div class="review-group-heading"><label><span class="sr-only">그룹 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="그룹 이름" maxlength="60" aria-label="${index + 1}번째 그룹 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">${state.confirmed ? '완료' : '확정'}</button></div>`;
 }
 function showReview() {
   ensureGroups();
@@ -783,7 +788,7 @@ document.addEventListener('click', event => {
   else if (action === 'review') showReview();
   else if (action === 'back') { reviewDialog.close(); updateControls(); save(); }
   else if (action === 'confirm') {
-    state.review.groups.forEach((g, i) => { g.name = g.name.trim() || `묶음 ${i + 1}`; });
+    state.review.groups.forEach((g, i) => { g.name = g.name.trim() || `그룹 ${i + 1}`; });
     const ids = [...state.review.singles, ...state.review.groups.flatMap(g => g.cardIds)];
     if (ids.length !== 30 || new Set(ids).size !== 30) { notify('카드 분류를 다시 확인해야 한다.'); return; }
     future = [];
