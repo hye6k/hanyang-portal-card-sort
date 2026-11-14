@@ -1,6 +1,7 @@
-import { integrated, urls } from '../study/flow.js?v=journey-1';
+import { integrated, urls } from '../study/flow.js?v=journey-2';
 import { cardNames } from '../test/cards.js';
 
+const practice = new URLSearchParams(location.search).get('practice') === '1';
 const CARD_W = 144, CARD_H = 70, GAP = 24;
 const CARD_CLEARANCE = 8, COLLISION_RADIUS = 16;
 const GROUP_PADDING = 20, GROUP_RADIUS = 18, GROUP_OUTLINE_GAP = 12;
@@ -38,7 +39,8 @@ const testDescriptions = [
   '고민이나 학습에 관해 상담받기 위해 신청하는 기능입니다.',
   '현장실습 기관을 찾아보고 실습 참여를 신청하는 기능입니다.',
 ];
-const catalog = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name, description: testDescriptions[i] }));
+const practiceNames = ['사과', '바나나', '연필', '지우개'];
+const catalog = (practice ? practiceNames : cardNames).map((name, i) => ({ id: `card-${i + 1}`, name, description: practice ? ['아삭한 식감의 과일입니다.', '껍질을 벗겨 먹는 과일입니다.', '글씨를 쓰거나 그림을 그리는 도구입니다.', '연필로 쓴 내용을 지우는 도구입니다.'][i] : testDescriptions[i] }));
 const viewport = document.querySelector('#viewport');
 const world = document.querySelector('#world');
 const cardsElement = document.querySelector('#cards');
@@ -47,7 +49,7 @@ const reviewDialog = document.querySelector('#review');
 const hint = document.querySelector('#hint');
 const detailPanel = document.querySelector('#card-detail');
 let detailCardId = null;
-const storageKey = 'hyu-spatial-card-sort-snap-collision-v1';
+const storageKey = practice ? 'hyu-card-sort-practice-v1' : 'hyu-spatial-card-sort-snap-collision-v1';
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const cardName = id => catalog.find(card => card.id === id)?.name || '';
@@ -58,12 +60,12 @@ function overviewView(positions) {
   const width = Math.max(...points.map(p => p.x + CARD_W)) - left;
   const height = Math.max(...points.map(p => p.y + CARD_H)) - top;
   const headerHeight = integrated ? 49 : 0;
-  const availableHeight = Math.max(1, innerHeight - 84 - headerHeight);
+  const availableHeight = Math.max(1, innerHeight - 84 - headerHeight - (practice ? 180 : 0));
   const scale = clamp(Math.min((innerWidth - 32) / width, (availableHeight - 32) / height), 0.01, 1.5);
   return { scale, x: (innerWidth - width * scale) / 2 - left * scale, y: headerHeight + (availableHeight - height * scale) / 2 - top * scale };
 }
 function initial(existingOrder) {
-  const cols = 5, rows = Math.ceil(catalog.length / cols);
+  const cols = practice ? 2 : 5, rows = Math.ceil(catalog.length / cols);
   const stepX = CARD_W + 48;
   const side = (cols - 1) * stepX + CARD_W;
   const stepY = rows > 1 ? (side - CARD_H) / (rows - 1) : 0;
@@ -85,7 +87,7 @@ function valid(value) {
   }) && value.view && ['x', 'y', 'scale'].every(k => Number.isFinite(value.view[k])) && value.view.scale >= 0.01 && value.view.scale <= 2.5;
 }
 let state;
-try { const value = JSON.parse(localStorage.getItem(storageKey) || 'null'); if (valid(value)) state = value; } catch {}
+try { const value = JSON.parse((practice ? sessionStorage : localStorage).getItem(storageKey) || 'null'); if (valid(value)) state = value; } catch {}
 if (state && isUntouchedOldGrid(state)) {
   const order = [...catalog].sort((a, b) => state.positions[a.id].y - state.positions[b.id].y || state.positions[a.id].x - state.positions[b.id].x);
   state = initial(order);
@@ -127,7 +129,7 @@ function armGroupHold() {
   }, 500);
 }
 
-function save() { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {} }
+function save() { try { (practice ? sessionStorage : localStorage).setItem(storageKey, JSON.stringify(state)); } catch {} if(practice) window.dispatchEvent(new CustomEvent('practice-state',{detail:{review:state.review,views:state.descriptionViews}})); }
 function announce(text) { document.querySelector('#announcer').textContent = text; }
 function notify(text) { const el = document.querySelector('#toast'); clearTimeout(toastTimer); el.textContent = text; el.classList.add('visible'); toastTimer = setTimeout(() => el.classList.remove('visible'), 2600); announce(text); }
 function remember(snapshot) {
@@ -766,7 +768,7 @@ function resetTest() {
   if (reviewDialog.open) reviewDialog.close();
   reviewDialog.innerHTML = '';
   document.querySelector('#toast').classList.remove('visible');
-  try { localStorage.removeItem(storageKey); } catch {}
+  try { (practice ? sessionStorage : localStorage).removeItem(storageKey); } catch {}
   state = initial();
   renderCards(); save();
   announce('저장된 배치와 분류를 지우고 다시 시작했다.');
@@ -792,10 +794,11 @@ document.addEventListener('click', event => {
   else if (action === 'confirm') {
     state.review.groups.forEach((g, i) => { g.name = g.name.trim() || `그룹 ${i + 1}`; });
     const ids = [...state.review.singles, ...state.review.groups.flatMap(g => g.cardIds)];
-    if (ids.length !== 30 || new Set(ids).size !== 30) { notify('카드 분류를 다시 확인해야 한다.'); return; }
+    if (ids.length !== catalog.length || new Set(ids).size !== catalog.length) { notify('카드 분류를 다시 확인해야 한다.'); return; }
     future = [];
     state.confirmed = true; state.confirmedAt = new Date().toISOString();
     reviewDialog.close(); drawOutlines(); updateControls(); save();
+    if (practice) { window.dispatchEvent(new Event('practice-finished')); return; }
     location.assign(integrated ? urls['post-1'] : '../post-survey/?stage=select&from=canvas&v=flow-8');
   }
 });
