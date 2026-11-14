@@ -22,7 +22,7 @@ const button = document.querySelector('#submit-button');
 const byId = id => document.getElementById(id);
 const named = name => form.elements.namedItem(name);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const newFunction = () => ({ id: crypto.randomUUID(), name: '', cannot_recall: false, reasons: [], other_reason: '' });
+const newFunction = () => ({ id: crypto.randomUUID(), name: '', reasons: [], other_reason: '' });
 const fresh = () => ({ version: VERSION, id: crypto.randomUUID(), startedAt: new Date().toISOString(), answers: { functions: [newFunction()] }, pending: null, done: false });
 let state = fresh();
 let submitting = false;
@@ -33,7 +33,7 @@ try {
     const legacy = JSON.parse(sessionStorage.getItem(LEGACY_KEY) || 'null');
     if (legacy?.answers && !legacy.done && typeof legacy.id === 'string') {
       const a = legacy.answers;
-      state = { ...legacy, version: VERSION, answers: { ...a, functions: [{ ...newFunction(), name: a.hardest_function || '', cannot_recall: !!a.cannot_recall, reasons: a.reasons || [], other_reason: a.other_reason || '' }] } };
+      state = { ...legacy, version: VERSION, answers: { ...a, functions: [{ ...newFunction(), name: a.hardest_function || '', reasons: a.reasons || [], other_reason: a.other_reason || '' }] } };
       // A frozen legacy request must retain its original UUID and body on retry.
     }
   }
@@ -42,7 +42,7 @@ const seenIds = new Set();
 state.answers.functions = (Array.isArray(state.answers.functions) && state.answers.functions.length ? state.answers.functions : [newFunction()]).map(item => {
   const id = typeof item.id === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(item.id) && !seenIds.has(item.id) ? item.id : crypto.randomUUID();
   seenIds.add(id);
-  return { id, name: typeof item.name === 'string' ? item.name : '', cannot_recall: !!item.cannot_recall, reasons: Array.isArray(item.reasons) ? item.reasons.filter(code => reasonOptions.some(([value]) => value === code)) : [], other_reason: typeof item.other_reason === 'string' ? item.other_reason : '' };
+  return { id, name: typeof item.name === 'string' ? item.name : '', reasons: Array.isArray(item.reasons) ? item.reasons.filter(code => reasonOptions.some(([value]) => value === code)) : [], other_reason: typeof item.other_reason === 'string' ? item.other_reason : '' };
 });
 function persist() {
   try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -55,8 +55,8 @@ byId('frequency-options').innerHTML = radioOptions('frequency', frequencyOptions
 byId('difficulty-options').innerHTML = radioOptions('difficulty', difficultyOptions.map((label, i) => [i + 1, label]), true);
 byId('ease-options').innerHTML = radioOptions('ease', easeOptions.map((label, i) => [i + 1, label]), true);
 
-const hasFunction = item => !!item.name.trim() || item.cannot_recall;
-const functionLabel = (item, index) => item.cannot_recall ? `기억나지 않는 기능 ${index + 1}` : item.name.trim();
+const hasFunction = item => !!item.name.trim();
+const functionLabel = item => item.name.trim();
 function ensureBlankFunction() {
   if (!state.pending && !state.done && hasFunction(state.answers.functions.at(-1))) state.answers.functions.push(newFunction());
 }
@@ -71,7 +71,6 @@ function renderFunctions() {
       byId('function-list').insertAdjacentHTML('beforeend', `<div class="function-entry" data-function-row="${item.id}" data-question="function-${item.id}">
         <label class="sr-only" for="function-name-${item.id}">기능 ${i + 1}</label>
         <div class="function-input-row"><input id="function-name-${item.id}" data-function-name type="text" value="${esc(item.name)}" maxlength="200" aria-describedby="function-hint function-${item.id}-error"><button type="button" class="remove-function" data-action="remove-function" data-function-id="${item.id}" aria-label="기능 삭제">×</button></div>
-        <label class="check-option recall-option"><input type="checkbox" data-cannot-recall ${item.cannot_recall ? 'checked' : ''}><span>기억나지 않음</span></label>
         <p class="field-error" id="function-${item.id}-error" hidden></p>
       </div>`);
       row = byId(`function-name-${item.id}`).closest('[data-function-row]');
@@ -116,7 +115,6 @@ function readFields() {
       const row = byId(`function-name-${item.id}`).closest('[data-function-row]');
       const reason = form.querySelector(`[data-reason-for="${item.id}"]`);
       return { id: item.id, name: row.querySelector('[data-function-name]').value,
-        cannot_recall: row.querySelector('[data-cannot-recall]').checked,
         reasons: reason ? [...reason.querySelectorAll('[data-reason]:checked')].map(el => el.value) : [...item.reasons],
         other_reason: reason ? reason.querySelector('[data-other-reason]').value : item.other_reason };
     }),
@@ -128,7 +126,6 @@ function errorsFor(a) {
   if (!frequencyOptions.some(([value]) => value === a.frequency)) errors.push(['frequency', '이용 빈도를 선택해 주세요.']);
   if (![1, 2, 3, 4, 5].includes(a.difficulty)) errors.push(['difficulty', '어려움을 겪은 빈도를 선택해 주세요.']);
   const filled = a.functions.filter(hasFunction);
-  if (a.difficulty !== 1 && !filled.length) errors.push(['hardest', '기능의 명칭이나 간단한 설명을 작성하거나 ‘기억나지 않음’을 선택해 주세요.']);
   if (a.difficulty !== 1) for (const item of filled) {
     if (!item.reasons.length) errors.push([`reason-${item.id}`, '이 기능을 찾기 어려웠던 이유를 하나 이상 선택해 주세요.']);
     else if (item.reasons.includes('other') && !item.other_reason.trim()) errors.push([`reason-${item.id}`, '이 기능의 기타 이유를 입력해 주세요.']);
@@ -172,7 +169,7 @@ function syncUI() {
   byId('reasons-fields').disabled = noDifficulty;
   if (noDifficulty) clearError('hardest');
   for (const item of a.functions) {
-    byId(`function-name-${item.id}`).disabled = noDifficulty || item.cannot_recall;
+    byId(`function-name-${item.id}`).disabled = noDifficulty;
     const reason = form.querySelector(`[data-reason-for="${item.id}"]`);
     if (!reason) continue;
     reason.querySelector('[data-other-field]').hidden = !item.reasons.includes('other');
@@ -194,7 +191,7 @@ function buildRecord(a) {
         portal_frequency: a.frequency, navigation_difficulty_frequency: a.difficulty,
         functions_not_applicable: noDifficulty,
         difficult_functions: noDifficulty ? [] : a.functions.filter(hasFunction).map(item => ({
-          id: item.id, recall_status: item.cannot_recall ? 'cannot_recall' : 'named', function_name: item.cannot_recall ? null : item.name.trim(),
+          id: item.id, recall_status: 'named', function_name: item.name.trim(),
           difficulty_reasons: { selected: [...item.reasons], other: item.reasons.includes('other') ? item.other_reason.trim() : null },
         })),
         perceived_navigation_ease: a.ease,
@@ -211,7 +208,6 @@ function buildRecord(a) {
 }
 function update(event) {
   if (state.pending || state.done || submitting) return;
-  if (event.target.matches('[data-cannot-recall]') && event.target.checked) event.target.closest('[data-function-row]').querySelector('[data-function-name]').value = '';
   state.answers = readFields();
   clearError(event.target.closest('[data-question]')?.dataset.question);
   ensureBlankFunction(); renderFunctions(); persist(); syncUI();
