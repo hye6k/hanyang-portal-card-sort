@@ -94,7 +94,7 @@ if (state.groupTerminologyVersion !== 1) {
   state.groupTerminologyVersion = 1;
 }
 state.descriptionViews ||= {};
-state.view = overviewView(state.positions);
+if (new URLSearchParams(location.search).get('resume') !== 'post-survey') state.view = overviewView(state.positions);
 const pointers = new Map();
 let gesture = null;
 let animation = null;
@@ -752,7 +752,7 @@ function reviewRows(ids) {
 }
 function renderReview() {
   const result = state.review;
-  reviewDialog.innerHTML = `<div class="review-heading"><h1>그룹 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group tone-${index % 4}"><div class="review-group-heading"><label><span class="sr-only">그룹 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="그룹 이름" maxlength="60" aria-label="${index + 1}번째 그룹 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">${state.confirmed ? '완료' : '확정'}</button></div>`;
+  reviewDialog.innerHTML = `<div class="review-heading"><h1>그룹 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group tone-${index % 4}"><div class="review-group-heading"><label><span class="sr-only">그룹 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="그룹 이름" maxlength="60" aria-label="${index + 1}번째 그룹 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">완료</button></div>`;
 }
 function showReview() {
   ensureGroups();
@@ -793,7 +793,8 @@ document.addEventListener('click', event => {
     if (ids.length !== 30 || new Set(ids).size !== 30) { notify('카드 분류를 다시 확인해야 한다.'); return; }
     future = [];
     state.confirmed = true; state.confirmedAt = new Date().toISOString();
-    reviewDialog.close(); drawOutlines(); updateControls(); save(); announce('분류를 확정했다.');
+    reviewDialog.close(); drawOutlines(); updateControls(); save();
+    location.assign('../post-survey/?stage=select&from=canvas&v=flow-1');
   }
 });
 reviewDialog.addEventListener('input', event => {
