@@ -8,7 +8,7 @@
   <meta name="description" content="한양대학교 포털 이용 경험에 대한 간단한 설문이다.">
   <title>포털 이용 경험 조사</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=survey-2">
+  <link rel="stylesheet" href="./style.css?v=survey-3">
 </head>
 <body>
   <a class="skip-link" href="#survey-form">설문으로 이동</a>
@@ -29,35 +29,34 @@
           <p class="field-error" id="participant-error" hidden></p>
         </section>
         <section class="question" data-question="frequency" aria-labelledby="frequency-title">
-          <div class="question-heading"><h2 id="frequency-title"><span class="question-number">02</span>한양대학교 포털을 얼마나 자주 사용하는가?</h2></div>
+          <div class="question-heading"><h2 id="frequency-title"><span class="question-number">02</span>한양대학교 포털을 얼마나 자주 사용하나요?</h2></div>
           <fieldset class="options" id="frequency-options" aria-labelledby="frequency-title" aria-describedby="frequency-error"><legend class="sr-only">포털 이용 빈도</legend></fieldset>
           <p class="field-error" id="frequency-error" hidden></p>
         </section>
         <section class="question" data-question="difficulty" aria-labelledby="difficulty-title">
-          <div class="question-heading"><h2 id="difficulty-title"><span class="question-number">03</span>원하는 메뉴를 찾는 데 어려움을 겪은 경험이 있는가?</h2></div>
+          <div class="question-heading"><h2 id="difficulty-title"><span class="question-number">03</span>원하는 메뉴를 찾는 데 어려움을 겪은 경험이 있나요?</h2></div>
           <fieldset class="scale" id="difficulty-options" aria-labelledby="difficulty-title" aria-describedby="difficulty-error"><legend class="sr-only">탐색 어려움의 빈도</legend></fieldset>
           <p class="field-error" id="difficulty-error" hidden></p>
         </section>
         <section class="question" data-question="hardest" aria-labelledby="hardest-title">
-          <div class="question-heading"><h2 id="hardest-title"><span class="question-number">04</span>찾기 가장 어려웠던 기능은 무엇인가?</h2></div>
-          <p class="not-applicable" id="hardest-skipped" hidden>앞선 문항에서 어려움을 겪은 적이 없다고 응답하여 해당 없음 처리된다.</p>
-          <fieldset id="hardest-fields" class="conditional-fields" aria-labelledby="hardest-title" aria-describedby="hardest-error"><legend class="sr-only">찾기 어려웠던 기능</legend>
-            <label class="sr-only" for="hardest-function">찾기 가장 어려웠던 기능명</label><input id="hardest-function" name="hardest_function" type="text" maxlength="200" placeholder="찾으려 했던 기능명을 입력한다." aria-describedby="hardest-error">
-            <label class="check-option recall-option"><input type="checkbox" name="cannot_recall"><span>기억나지 않음</span></label>
+          <div class="question-heading"><h2 id="hardest-title"><span class="question-number">04</span>찾기 어려웠던 기능은 무엇인가요?</h2></div>
+          <p class="not-applicable" id="hardest-skipped" hidden>앞선 문항에서 어려움을 겪은 적이 없다고 응답하여 해당 없음으로 처리됩니다.</p>
+          <fieldset id="hardest-fields" class="conditional-fields" aria-labelledby="hardest-title"><legend class="sr-only">찾기 어려웠던 기능</legend>
+            <div id="function-list" class="function-list"></div>
+            <button type="button" id="add-function" class="add-function" data-action="add-function">＋ 기능 추가</button>
           </fieldset>
           <p class="field-error" id="hardest-error" hidden></p>
         </section>
         <section class="question" data-question="reasons" aria-labelledby="reasons-title">
-          <div class="question-heading"><h2 id="reasons-title"><span class="question-number">05</span>해당 기능을 찾기 어려웠던 이유는 무엇인가?</h2></div>
-          <p class="not-applicable" id="reasons-skipped" hidden>앞선 문항에서 어려움을 겪은 적이 없다고 응답하여 해당 없음 처리된다.</p>
-          <fieldset id="reasons-fields" class="conditional-fields" aria-labelledby="reasons-title" aria-describedby="reasons-error"><legend class="sr-only">탐색이 어려웠던 이유</legend>
-            <div class="options" id="reason-options"></div>
-            <div class="other-field" id="other-field" hidden><label for="other-reason">기타 이유</label><textarea id="other-reason" name="other_reason" rows="3" maxlength="800" placeholder="이유를 간단히 입력한다." aria-describedby="reasons-error" disabled></textarea></div>
+          <div class="question-heading"><h2 id="reasons-title"><span class="question-number">05</span>각 기능을 찾기 어려웠던 이유는 무엇인가요?</h2></div>
+          <p class="not-applicable" id="reasons-skipped" hidden>앞선 문항에서 어려움을 겪은 적이 없다고 응답하여 해당 없음으로 처리됩니다.</p>
+          <fieldset id="reasons-fields" class="conditional-fields" aria-labelledby="reasons-title"><legend class="sr-only">기능별로 탐색이 어려웠던 이유</legend>
+            <div id="reason-list"></div>
           </fieldset>
           <p class="field-error" id="reasons-error" hidden></p>
         </section>
         <section class="question" data-question="ease" aria-labelledby="ease-title">
-          <div class="question-heading"><h2 id="ease-title"><span class="question-number">06</span>현재 포털에서 원하는 기능을 쉽게 찾을 수 있다고 생각하는가?</h2></div>
+          <div class="question-heading"><h2 id="ease-title"><span class="question-number">06</span>현재 포털에서 원하는 기능을 쉽게 찾을 수 있다고 생각하나요?</h2></div>
           <fieldset class="scale" id="ease-options" aria-labelledby="ease-title" aria-describedby="ease-error"><legend class="sr-only">주관적 탐색 용이성</legend></fieldset>
           <p class="field-error" id="ease-error" hidden></p>
         </section>
@@ -68,14 +67,14 @@
         </section>
       </fieldset>
       <p id="validation-summary" class="validation-summary" role="alert" hidden></p>
-      <p id="pending-note" class="pending-note" hidden>전송할 응답을 보관 중이다. 다시 제출하면 같은 내용으로 재시도한다.</p>
+      <p id="pending-note" class="pending-note" hidden>전송할 응답을 보관하고 있습니다. 다시 제출하면 같은 내용으로 재시도합니다.</p>
       <p id="submit-error" class="submit-error" role="alert" hidden></p>
       <div class="submit-bar"><button id="submit-button" class="primary-button" type="submit">응답 제출</button></div>
     </form>
-    <section class="complete-panel" id="complete-panel" aria-labelledby="complete-title" hidden><span class="complete-check" aria-hidden="true">✓</span><h2 id="complete-title" tabindex="-1">응답이 저장되었다.</h2><p>참여에 감사한다.<br>이 창을 닫아도 된다.</p><span class="complete-note">시험 응답으로 구분해 저장했다.</span></section>
+    <section class="complete-panel" id="complete-panel" aria-labelledby="complete-title" hidden><span class="complete-check" aria-hidden="true">✓</span><h2 id="complete-title" tabindex="-1">응답이 저장되었습니다.</h2><p>참여해 주셔서 감사합니다.<br>이 창을 닫으셔도 됩니다.</p><span class="complete-note">시험 응답으로 구분해 저장했습니다.</span></section>
   </main>
   <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <noscript>응답하려면 브라우저에서 JavaScript를 허용해야 한다.</noscript>
-  <script type="module" src="./app.js?v=survey-2"></script>
+  <script type="module" src="./app.js?v=survey-3"></script>
 </body>
 </html>
