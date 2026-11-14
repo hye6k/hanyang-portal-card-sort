@@ -106,7 +106,6 @@ function restoreHistory(entry) {
 }
 function invalidate() { state.review = null; state.confirmed = false; drawOutlines(); updateControls(); }
 function updateControls() {
-  document.querySelector('#zoom').textContent = `${Math.round(state.view.scale * 100)}%`;
   document.querySelector('[data-action=undo]').disabled = !history.length;
   document.querySelector('[data-action=redo]').disabled = !future.length;
   document.querySelector('[data-action=review]').textContent = state.confirmed ? '묶음 보기' : '묶음 확인';
@@ -615,7 +614,6 @@ document.addEventListener('click', event => {
   if (!button || button.disabled) return;
   const action = button.dataset.action;
   if (action === 'reset-test') resetTest();
-  else if (action === 'zoom-in' || action === 'zoom-out') { zoomAt(innerWidth / 2, (innerHeight - 70) / 2, state.view.scale * (action === 'zoom-in' ? 1.25 : 0.8)); save(); }
   else if (action === 'fit') fitAll();
   else if (action === 'undo' && history.length) {
     future.push(historySnapshot());
