@@ -249,10 +249,12 @@ function focusCard(id) {
 
 const SNAP_GAP = 12;
 function makeSnapPlan() {
-  const activeIds = gesture.type === 'group' ? gesture.ids : [gesture.id];
+  // Whole-group dragging only relocates the group; merging starts with one card.
+  if (gesture?.type !== 'card') return null;
+  const activeIds = [gesture.id];
   const activeSet = new Set(activeIds);
   const stationary = catalog.filter(card => !activeSet.has(card.id));
-  const threshold = gesture.type === 'group' ? 52 : 28;
+  const threshold = 28;
   const objects = stationary.map(card => {
     const target = state.positions[card.id];
     let nearest = null;
@@ -314,6 +316,7 @@ function arrangementOrigin(grid, ids) {
   return candidates.find(free);
 }
 function arrangeMerged(activeIds, targetIds = []) {
+  if (gesture?.type !== 'card' || activeIds.length !== 1) return [];
   const active = new Set(activeIds), clusters = spatialClusters();
   const joined = clusters.filter(ids => ids.some(id => active.has(id)) && ids.some(id => !active.has(id)));
   if (!joined.length && !targetIds.length) return [];
@@ -519,7 +522,7 @@ function finishPointer(event, cancelled = false) {
         const wasGroup = gesture.type === 'group';
         const snap = makeSnapPlan();
         if (snap) applySnap(snap);
-        const arranged = arrangeMerged(wasGroup ? gesture.ids : [gesture.id], snap?.targetIds || []);
+        const arranged = wasGroup ? [] : arrangeMerged([gesture.id], snap?.targetIds || []);
         animateArrangement(arranged.length ? arranged : snap?.ids || []);
         remember(gesture.snapshot, wasGroup || !!snap || !!arranged.length);
         if (snap || arranged.length || !wasGroup || !state.confirmed) invalidate();
