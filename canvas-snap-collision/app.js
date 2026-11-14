@@ -59,6 +59,7 @@ const pointers = new Map();
 let gesture = null;
 let animation = null;
 let history = [];
+let future = [];
 let selectedId = null;
 let toastTimer;
 let lastTap = null;
@@ -91,12 +92,23 @@ function notify(text) { const el = document.querySelector('#toast'); clearTimeou
 function remember(snapshot, preserveClassification = false) {
   history.push({ positions: snapshot, classification: preserveClassification ? { review: copy(state.review), confirmed: state.confirmed, confirmedAt: state.confirmedAt } : null });
   if (history.length > 20) history.shift();
+  future = [];
   updateControls();
+}
+function historySnapshot() {
+  return { positions: copy(state.positions), classification: { review: copy(state.review ?? null), confirmed: !!state.confirmed, confirmedAt: state.confirmedAt } };
+}
+function restoreHistory(entry) {
+  state.positions = copy(entry.positions);
+  if (entry.classification) Object.assign(state, entry.classification);
+  else invalidate();
+  paint(); save();
 }
 function invalidate() { state.review = null; state.confirmed = false; drawOutlines(); updateControls(); }
 function updateControls() {
   document.querySelector('#zoom').textContent = `${Math.round(state.view.scale * 100)}%`;
   document.querySelector('[data-action=undo]').disabled = !history.length;
+  document.querySelector('[data-action=redo]').disabled = !future.length;
   document.querySelector('[data-action=review]').textContent = state.confirmed ? '묶음 보기' : '묶음 확인';
 }
 
@@ -588,7 +600,7 @@ function showReview() {
 }
 function resetTest() {
   cancelHold(); stopAnimation(); clearTimeout(toastTimer);
-  pointers.clear(); gesture = null; history = []; selectedId = null; lastTap = null; previewGroups = [];
+  pointers.clear(); gesture = null; history = []; future = []; selectedId = null; lastTap = null; previewGroups = [];
   if (reviewDialog.open) reviewDialog.close();
   reviewDialog.innerHTML = '';
   document.querySelector('#toast').classList.remove('visible');
@@ -606,11 +618,12 @@ document.addEventListener('click', event => {
   else if (action === 'zoom-in' || action === 'zoom-out') { zoomAt(innerWidth / 2, (innerHeight - 70) / 2, state.view.scale * (action === 'zoom-in' ? 1.25 : 0.8)); save(); }
   else if (action === 'fit') fitAll();
   else if (action === 'undo' && history.length) {
-    const previous = history.pop();
-    state.positions = previous.positions;
-    if (previous.classification) Object.assign(state, previous.classification);
-    else invalidate();
-    paint(); save();
+    future.push(historySnapshot());
+    restoreHistory(history.pop());
+  }
+  else if (action === 'redo' && future.length) {
+    history.push(historySnapshot());
+    restoreHistory(future.pop());
   }
   else if (action === 'review') showReview();
   else if (action === 'back') { reviewDialog.close(); updateControls(); save(); }
@@ -618,13 +631,14 @@ document.addEventListener('click', event => {
     state.review.groups.forEach((g, i) => { g.name = g.name.trim() || `묶음 ${i + 1}`; });
     const ids = [...state.review.singles, ...state.review.groups.flatMap(g => g.cardIds)];
     if (ids.length !== 30 || new Set(ids).size !== 30) { notify('카드 분류를 다시 확인해야 한다.'); return; }
+    future = [];
     state.confirmed = true; state.confirmedAt = new Date().toISOString();
     reviewDialog.close(); drawOutlines(); updateControls(); save(); announce('분류를 확정했다.');
   }
 });
 reviewDialog.addEventListener('input', event => {
   const group = state.review.groups.find(g => g.id === event.target.dataset.groupName);
-  if (group) { group.name = event.target.value; state.confirmed = false; drawOutlines(); updateControls(); save(); }
+  if (group) { future = []; group.name = event.target.value; state.confirmed = false; drawOutlines(); updateControls(); save(); }
 });
 window.addEventListener('resize', paint);
 setTimeout(() => hint.classList.add('hidden'), 6500);
