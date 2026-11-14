@@ -1,7 +1,9 @@
 import { cardNames } from '../test/cards.js';
 
 const CARD_W = 144, CARD_H = 70, GAP = 24;
-const CARD_CLEARANCE = 8, COLLISION_RADIUS = 16, GROUP_CLEARANCE = 44;
+const CARD_CLEARANCE = 8, COLLISION_RADIUS = 16;
+const GROUP_PADDING = 20, GROUP_RADIUS = 18, GROUP_OUTLINE_GAP = 12;
+const GROUP_CLEARANCE = GROUP_PADDING * 2 + GROUP_OUTLINE_GAP;
 const catalog = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name }));
 const viewport = document.querySelector('#viewport');
 const world = document.querySelector('#world');
@@ -104,6 +106,7 @@ function renderCards() {
 }
 function paint() {
   const snap = isCardGesture() && gesture.moved ? makeSnapPlan() : null;
+  if (isCardGesture()) gesture.snapPlan = snap;
   world.style.transform = `translate3d(${state.view.x}px,${state.view.y}px,0) scale(${state.view.scale})`;
   world.style.setProperty('--group-stroke', `${2 / state.view.scale}px`);
   world.style.setProperty('--confirmed-stroke', `${2.5 / state.view.scale}px`);
@@ -136,9 +139,10 @@ function paint() {
 function drawOutlines() {
   const confirmed = state.confirmed && state.review && !(gesture?.type === 'card' && gesture.moved);
   let groups = confirmed ? state.review.groups : spatialClusters(gesture?.type === 'group' ? gesture.ids : []).filter(ids => ids.length > 1).map(cardIds => ({ cardIds }));
-  if (gesture?.type === 'group') {
+  if ((isCardGesture() && gesture.moved) || gesture?.type === 'group') {
+    // A dragged card must not visually bridge otherwise separate target groups.
     groups = gesture.others.filter(group => group.cardIds.length > 1).map(group => ({ ...group }));
-    groups.push({ cardIds: gesture.ids, name: gesture.groupName, held: true });
+    if (gesture.type === 'group') groups.push({ cardIds: gesture.ids, name: gesture.groupName, held: true });
   }
   if (!confirmed) {
     // Keep each area's colour while cards enter, leave, or reorder the clusters.
@@ -158,13 +162,13 @@ function drawOutlines() {
   }
   const markup = groups.map((group, index) => {
     const positions = group.cardIds.map(id => state.positions[id]);
-    const x = Math.min(...positions.map(p => p.x)) - 16;
-    const y = Math.min(...positions.map(p => p.y)) - 24;
-    const right = Math.max(...positions.map(p => p.x + CARD_W)) + 16;
-    const bottom = Math.max(...positions.map(p => p.y + CARD_H)) + 16;
+    const x = Math.min(...positions.map(p => p.x)) - GROUP_PADDING;
+    const y = Math.min(...positions.map(p => p.y)) - GROUP_PADDING;
+    const right = Math.max(...positions.map(p => p.x + CARD_W)) + GROUP_PADDING;
+    const bottom = Math.max(...positions.map(p => p.y + CARD_H)) + GROUP_PADDING;
     const anchor = [...positions].sort((a, b) => a.y - b.y || a.x - b.x)[0];
     const label = confirmed ? group.name : null;
-    const labelMarkup = label ? `<span style="left:${anchor.x - x + 4}px;top:${anchor.y - y - 21}px">${escape(label)}</span>` : '';
+    const labelMarkup = label ? `<span style="left:${anchor.x - x + 4}px;top:${anchor.y - y - 19}px">${escape(label)}</span>` : '';
     const width = right - x, height = bottom - y;
     return `<div aria-hidden="true" class="group-outline ${confirmed ? 'confirmed' : 'preview'} ${group.held ? 'group-held' : ''} tone-${group.tone ?? index % 4}" data-cards="${group.cardIds.join(',')}" style="left:${x}px;top:${y}px;width:${width}px;height:${height}px"><svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path fill-rule="evenodd" d="${roundedContour(positions, x, y)}"/></svg>${labelMarkup}</div>`;
   }).join('');
@@ -174,7 +178,7 @@ function drawOutlines() {
 function roundedContour(positions, originX, originY) {
   // Trace the union of padded card rectangles, retaining concave gaps and holes.
   // Coordinate compression keeps the work bounded by card count, not world size.
-  const rectangles = positions.map(p => ({ left: p.x - 16, right: p.x + CARD_W + 16, top: p.y - 24, bottom: p.y + CARD_H + 16 }));
+  const rectangles = positions.map(p => ({ left: p.x - GROUP_PADDING, right: p.x + CARD_W + GROUP_PADDING, top: p.y - GROUP_PADDING, bottom: p.y + CARD_H + GROUP_PADDING }));
   const xs = [...new Set(rectangles.flatMap(r => [r.left, r.right]))].sort((a, b) => a - b);
   const ys = [...new Set(rectangles.flatMap(r => [r.top, r.bottom]))].sort((a, b) => a - b);
   const xi = new Map(xs.map((x, i) => [x, i])), yi = new Map(ys.map((y, i) => [y, i]));
@@ -222,7 +226,7 @@ function roundedContour(positions, originX, originY) {
     const curves = points.map((p, i) => {
       const prev = points[(i + points.length - 1) % points.length], next = points[(i + 1) % points.length];
       const incoming = Math.hypot(p.x - prev.x, p.y - prev.y), outgoing = Math.hypot(next.x - p.x, next.y - p.y);
-      const radius = Math.min(18, incoming / 2, outgoing / 2);
+      const radius = Math.min(GROUP_RADIUS, incoming / 2, outgoing / 2);
       return { p, start: { x: p.x + (prev.x - p.x) / incoming * radius, y: p.y + (prev.y - p.y) / incoming * radius }, end: { x: p.x + (next.x - p.x) / outgoing * radius, y: p.y + (next.y - p.y) / outgoing * radius } };
     });
     return curves.map((c, i) => `${i ? 'L' : 'M'}${n(c.start.x)},${n(c.start.y)} Q${n(c.p.x)},${n(c.p.y)} ${n(c.end.x)},${n(c.end.y)}`).join(' ') + ' Z';
@@ -249,40 +253,28 @@ function focusCard(id) {
 
 const SNAP_GAP = 12;
 function makeSnapPlan() {
-  // Whole-group dragging only relocates the group; merging starts with one card.
   if (gesture?.type !== 'card') return null;
-  const activeIds = [gesture.id];
-  const activeSet = new Set(activeIds);
-  const stationary = catalog.filter(card => !activeSet.has(card.id));
-  const threshold = 28;
-  const objects = stationary.map(card => {
-    const target = state.positions[card.id];
-    let nearest = null;
-    for (const id of activeIds) {
-      const p = state.positions[id];
-      const distance = Math.hypot(Math.max(0, p.x - target.x - CARD_W, target.x - p.x - CARD_W), Math.max(0, p.y - target.y - CARD_H, target.y - p.y - CARD_H));
-      const center = Math.hypot(p.x - target.x, p.y - target.y);
-      if (!nearest || distance < nearest.distance || distance === nearest.distance && center < nearest.center) nearest = { id, distance, center };
+  const id = gesture.id, p = state.positions[id];
+  const candidates = gesture.others.map(group => {
+    let distance = Infinity, center = Infinity;
+    for (const other of group.cardIds) {
+      const target = state.positions[other];
+      const edge = Math.hypot(Math.max(0, p.x - target.x - CARD_W, target.x - p.x - CARD_W), Math.max(0, p.y - target.y - CARD_H, target.y - p.y - CARD_H));
+      const middle = Math.hypot(p.x - target.x, p.y - target.y);
+      if (edge < distance || edge === distance && middle < center) { distance = edge; center = middle; }
     }
-    return { card, target, ...nearest };
-  }).filter(object => object.distance <= threshold).sort((a, b) => a.distance - b.distance || a.center - b.center);
-  for (const object of objects) {
-    const target = object.target, anchor = state.positions[object.id];
-    const slots = [
-      { side: 'left', x: target.x - CARD_W - SNAP_GAP, y: target.y },
-      { side: 'right', x: target.x + CARD_W + SNAP_GAP, y: target.y },
-      { side: 'top', x: target.x, y: target.y - CARD_H - SNAP_GAP },
-      { side: 'bottom', x: target.x, y: target.y + CARD_H + SNAP_GAP }
-    ].sort((a, b) => Math.hypot(a.x - anchor.x, a.y - anchor.y) - Math.hypot(b.x - anchor.x, b.y - anchor.y));
-    for (const slot of slots) {
-      const dx = slot.x - anchor.x, dy = slot.y - anchor.y;
-      const placements = Object.fromEntries(activeIds.map(id => [id, { x: state.positions[id].x + dx, y: state.positions[id].y + dy }]));
-      const free = Object.values(placements).every(p => p.x >= -10000 && p.x <= 10000 && p.y >= -10000 && p.y <= 10000 && stationary.every(card => {
-        const other = state.positions[card.id];
-        return p.x + CARD_W <= other.x + .001 || other.x + CARD_W <= p.x + .001 || p.y + CARD_H <= other.y + .001 || other.y + CARD_H <= p.y + .001;
-      }));
-      if (free) return { side: slot.side, placements, activeIds: [...activeIds], targetIds: [object.card.id], ids: [...activeIds] };
-    }
+    return { group, distance, center };
+  }).filter(candidate => candidate.distance <= 28).sort((a, b) => a.distance - b.distance || a.center - b.center);
+  for (const { group } of candidates) {
+    // Hint and drop share this complete group and these exact final placements.
+    const ids = [id, ...group.cardIds].sort((a, b) => state.positions[a].y - state.positions[b].y || state.positions[a].x - state.positions[b].x);
+    const grid = chooseGrid(ids.length), origin = arrangementOrigin(grid, ids);
+    if (!origin) continue;
+    const placements = Object.fromEntries(ids.map((member, i) => [member, {
+      x: origin.x + (i % grid.cols) * (CARD_W + SNAP_GAP),
+      y: origin.y + Math.floor(i / grid.cols) * (CARD_H + SNAP_GAP)
+    }]));
+    return { ids, targetIds: [...group.cardIds], placements };
   }
   return null;
 }
@@ -302,7 +294,7 @@ function arrangementOrigin(grid, ids) {
   const maxX = 10000 - (grid.cols - 1) * (CARD_W + SNAP_GAP), maxY = 10000 - (grid.rows - 1) * (CARD_H + SNAP_GAP);
   const preferred = { x: clamp((left + right - grid.width) / 2, -10000, maxX), y: clamp((top + bottom - grid.height) / 2, -10000, maxY) };
   const outside = catalog.filter(card => !members.has(card.id)).map(card => state.positions[card.id]);
-  const margin = 44;
+  const margin = GROUP_CLEARANCE;
   const free = p => outside.every(other => p.x + grid.width + margin <= other.x + .001 || other.x + CARD_W + margin <= p.x + .001 || p.y + grid.height + margin <= other.y + .001 || other.y + CARD_H + margin <= p.y + .001);
   if (free(preferred)) return preferred;
   const xs = new Set([preferred.x, -10000, maxX]), ys = new Set([preferred.y, -10000, maxY]);
@@ -314,25 +306,6 @@ function arrangementOrigin(grid, ids) {
   for (const x of xs) for (const y of ys) candidates.push({ x, y });
   candidates.sort((a, b) => (a.x - preferred.x) ** 2 + (a.y - preferred.y) ** 2 - (b.x - preferred.x) ** 2 - (b.y - preferred.y) ** 2);
   return candidates.find(free);
-}
-function arrangeMerged(activeIds, targetIds = []) {
-  if (gesture?.type !== 'card' || activeIds.length !== 1) return [];
-  const active = new Set(activeIds), clusters = spatialClusters();
-  const joined = clusters.filter(ids => ids.some(id => active.has(id)) && ids.some(id => !active.has(id)));
-  if (!joined.length && !targetIds.length) return [];
-  const members = new Set([...activeIds, ...targetIds, ...joined.flat()]);
-  if (state.confirmed && state.review) for (const group of state.review.groups) {
-    if (group.cardIds.some(id => !active.has(id) && members.has(id))) group.cardIds.forEach(id => members.add(id));
-  }
-  for (const ids of clusters) if (ids.some(id => members.has(id))) ids.forEach(id => members.add(id));
-  const ids = [...members].sort((a, b) => state.positions[a].y - state.positions[b].y || state.positions[a].x - state.positions[b].x);
-  const grid = chooseGrid(ids.length), origin = arrangementOrigin(grid, ids);
-  if (!origin) return [];
-  ids.forEach((id, i) => {
-    state.positions[id].x = origin.x + (i % grid.cols) * (CARD_W + SNAP_GAP);
-    state.positions[id].y = origin.y + Math.floor(i / grid.cols) * (CARD_H + SNAP_GAP);
-  });
-  return ids;
 }
 function animateArrangement(ids) {
   for (const id of ids) {
@@ -357,11 +330,15 @@ function updateCard(point) {
   pushNeighbours();
 }
 function collisionContact(a, b, clearance) {
-  // Minkowski sum of two rounded cards plus the requested separation.
+  // Whole-group contact uses the same padded, rounded boundary as its outline.
+  const grouped = clearance === GROUP_CLEARANCE;
+  const padding = grouped ? GROUP_PADDING : 0;
+  const corner = grouped ? GROUP_RADIUS : COLLISION_RADIUS;
+  const separation = grouped ? GROUP_OUTLINE_GAP : clearance;
   const dx = a.x - b.x, dy = a.y - b.y;
-  const qx = Math.abs(dx) - (CARD_W - 2 * COLLISION_RADIUS);
-  const qy = Math.abs(dy) - (CARD_H - 2 * COLLISION_RADIUS);
-  const radius = 2 * COLLISION_RADIUS + clearance;
+  const qx = Math.abs(dx) - (CARD_W + padding * 2 - corner * 2);
+  const qy = Math.abs(dy) - (CARD_H + padding * 2 - corner * 2);
+  const radius = 2 * corner + separation;
   const outsideX = Math.max(qx, 0), outsideY = Math.max(qy, 0);
   const length = Math.hypot(outsideX, outsideY);
   const distance = length + Math.min(Math.max(qx, qy), 0) - radius;
@@ -520,12 +497,10 @@ function finishPointer(event, cancelled = false) {
       if (cancelled) restoreDrag();
       else if (gesture.moved) {
         const wasGroup = gesture.type === 'group';
-        const snap = makeSnapPlan();
-        if (snap) applySnap(snap);
-        const arranged = wasGroup ? [] : arrangeMerged([gesture.id], snap?.targetIds || []);
-        animateArrangement(arranged.length ? arranged : snap?.ids || []);
-        remember(gesture.snapshot, wasGroup || !!snap || !!arranged.length);
-        if (snap || arranged.length || !wasGroup || !state.confirmed) invalidate();
+        const snap = gesture.snapPlan;
+        if (snap) { applySnap(snap); animateArrangement(snap.ids); }
+        remember(gesture.snapshot, wasGroup || !!snap);
+        if (snap || !wasGroup || !state.confirmed) invalidate();
       }
       else if (gesture.type === 'card') {
         if (lastTap?.id === gesture.id && Date.now() - lastTap.time < 330) focusCard(gesture.id);
