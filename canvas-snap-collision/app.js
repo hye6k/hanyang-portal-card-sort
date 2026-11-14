@@ -4,13 +4,48 @@ const CARD_W = 144, CARD_H = 70, GAP = 24;
 const CARD_CLEARANCE = 8, COLLISION_RADIUS = 16;
 const GROUP_PADDING = 20, GROUP_RADIUS = 18, GROUP_OUTLINE_GAP = 12;
 const GROUP_CLEARANCE = GROUP_PADDING * 2 + GROUP_OUTLINE_GAP;
-const catalog = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name }));
+// Interaction-test copy only; these descriptions are not verified portal documentation.
+const testDescriptions = [
+  '이번 학기에 수강한 과목의 성적을 확인하는 화면입니다.',
+  '학기별로 나누어 이전 성적 기록을 살펴볼 수 있습니다.',
+  '졸업에 필요한 조건을 얼마나 충족했는지 확인하는 기능입니다.',
+  '필수 과목을 이수했는지 확인하는 화면입니다.',
+  '원하는 교과목의 정보를 찾아보는 기능입니다.',
+  '전공에서 어떤 과목을 배우는지 교육과정을 살펴볼 수 있습니다.',
+  '교과목과 관련된 자료와 정보를 모아 확인하는 화면입니다.',
+  '신청한 수업 목록과 신청 내역을 확인하는 기능입니다.',
+  '수업별 출석 기록을 확인하는 화면입니다.',
+  '강의에 대한 평가 결과를 찾아보는 기능입니다.',
+  '계절학기에 듣고 싶은 수업의 수요를 제출하는 기능입니다.',
+  '일정 기간 학업을 쉬기 위한 신청을 진행합니다.',
+  '소속 학과를 변경하기 위한 신청을 진행합니다.',
+  '전공을 신청하거나 신청한 전공을 포기하는 기능입니다.',
+  '납부할 등록금이 적힌 고지서를 출력하는 기능입니다.',
+  '납부한 금액과 납부 내역을 확인하는 화면입니다.',
+  '등록금을 여러 차례 나누어 납부하도록 신청하는 기능입니다.',
+  '지금까지 받은 장학금 내역을 살펴볼 수 있습니다.',
+  '교내 장학금에 지원하기 위한 신청 화면입니다.',
+  '포털에서 제공하는 증명서를 발급받는 기능입니다.',
+  '포털 로그인에 사용하는 비밀번호를 변경합니다.',
+  '등록된 개인 정보를 확인하고 수정하는 화면입니다.',
+  '포털 이용 환경과 로그인 관련 설정을 변경하는 기능입니다.',
+  '포털에서 사용하는 아이디를 변경하는 기능입니다.',
+  '로그인 인증에 사용할 일회용 인증 수단을 설정하는 기능입니다.',
+  '학교 메일을 신청하거나 메일 서비스로 이동하는 기능입니다.',
+  '정규 수업 외의 프로그램에 참여를 신청하는 기능입니다.',
+  '참여한 비교과 프로그램과 활동 내역을 살펴볼 수 있습니다.',
+  '고민이나 학습에 관해 상담받기 위해 신청하는 기능입니다.',
+  '현장실습 기관을 찾아보고 실습 참여를 신청하는 기능입니다.',
+];
+const catalog = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name, description: testDescriptions[i] }));
 const viewport = document.querySelector('#viewport');
 const world = document.querySelector('#world');
 const cardsElement = document.querySelector('#cards');
 const outlines = document.querySelector('#outlines');
 const reviewDialog = document.querySelector('#review');
 const hint = document.querySelector('#hint');
+const detailPanel = document.querySelector('#card-detail');
+let detailCardId = null;
 const storageKey = 'hyu-spatial-card-sort-snap-collision-v1';
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -34,7 +69,7 @@ function initial(existingOrder) {
   if (!existingOrder) for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
   const positions = {};
   order.forEach((card, index) => { positions[card.id] = { x: (index % cols) * stepX, y: Math.floor(index / cols) * stepY, z: index + 1 }; });
-  return { positions, view: overviewView(positions), review: null, confirmed: false, layoutVersion: 'square-v1' };
+  return { positions, view: overviewView(positions), review: null, confirmed: false, layoutVersion: 'square-v1', descriptionViews: {} };
 }
 function isUntouchedOldGrid(value) {
   if (value.layoutVersion || value.review || value.confirmed) return false;
@@ -54,6 +89,7 @@ if (state && isUntouchedOldGrid(state)) {
   state = initial(order);
 }
 state ||= initial();
+state.descriptionViews ||= {};
 state.view = overviewView(state.positions);
 const pointers = new Map();
 let gesture = null;
@@ -146,8 +182,70 @@ function updateControls() {
   document.querySelector('[data-action=review]').textContent = state.confirmed ? '묶음 보기' : '묶음 확인';
 }
 
+function positionCardDetail() {
+  if (detailPanel.hidden || !detailCardId) return;
+  if (innerWidth <= 700) {
+    const visual = window.visualViewport;
+    const keyboardInset = visual ? Math.max(0, innerHeight - visual.height - visual.offsetTop) : 0;
+    detailPanel.style.left = '12px'; detailPanel.style.top = 'auto';
+    detailPanel.style.bottom = `calc(${74 + keyboardInset}px + env(safe-area-inset-bottom))`;
+    detailPanel.style.maxHeight = `${Math.max(140, Math.min(420, (visual?.height || innerHeight) - 100))}px`;
+    return;
+  }
+  detailPanel.style.bottom = 'auto'; detailPanel.style.maxHeight = 'calc(100dvh - 100px)';
+  const rect = cardsElement.querySelector(`[data-id="${detailCardId}"]`).getBoundingClientRect();
+  const width = detailPanel.offsetWidth, height = detailPanel.offsetHeight;
+  let left = rect.right + 12;
+  if (left + width > innerWidth - 12) left = rect.left - width - 12;
+  detailPanel.style.left = `${clamp(left, 12, Math.max(12, innerWidth - width - 12))}px`;
+  detailPanel.style.top = `${clamp(rect.top, 12, Math.max(12, innerHeight - height - 78))}px`;
+}
+function closeCardDetail(restoreFocus = false) {
+  const previous = detailCardId;
+  if (!restoreFocus && detailPanel.contains(document.activeElement)) document.activeElement.blur();
+  detailPanel.hidden = true; detailCardId = null;
+  document.querySelector('#single-group-form').hidden = true;
+  if (restoreFocus && previous) cardsElement.querySelector(`[data-id="${previous}"]`)?.focus({ preventScroll: true });
+}
+function openCardDetail(id) {
+  const card = catalog.find(card => card.id === id);
+  if (!card) return;
+  detailCardId = id;
+  document.querySelector('#detail-title').textContent = card.name;
+  document.querySelector('#detail-description').textContent = card.description;
+  document.querySelector('#single-group-form').hidden = true;
+  document.querySelector('#single-group-name').value = '';
+  document.querySelector('#single-group-error').hidden = true;
+  document.querySelector('#start-single-group').hidden = ensureGroups().groups.some(group => group.cardIds.includes(id));
+  detailPanel.hidden = false; positionCardDetail();
+  document.querySelector('#close-card-detail').focus({ preventScroll: true });
+  const now = new Date().toISOString(), previous = state.descriptionViews[id];
+  state.descriptionViews[id] = { count: (previous?.count || 0) + 1, firstViewedAt: previous?.firstViewedAt || now, lastViewedAt: now, descriptionVersion: 'test-v1' };
+  save();
+}
+document.querySelector('#close-card-detail').addEventListener('click', () => closeCardDetail(true));
+document.querySelector('#start-single-group').addEventListener('click', () => {
+  if (!detailCardId || ensureGroups().groups.some(group => group.cardIds.includes(detailCardId))) return;
+  document.querySelector('#start-single-group').hidden = true;
+  document.querySelector('#single-group-form').hidden = false;
+  positionCardDetail(); document.querySelector('#single-group-name').focus({ preventScroll: true });
+});
+document.querySelector('#single-group-form').addEventListener('submit', event => {
+  event.preventDefault();
+  if (!detailCardId || ensureGroups().groups.some(group => group.cardIds.includes(detailCardId))) return;
+  const input = document.querySelector('#single-group-name'), name = input.value.trim();
+  if (!name) { const error = document.querySelector('#single-group-error'); error.textContent = '그룹 이름을 입력해 주세요.'; error.hidden = false; positionCardDetail(); input.focus(); return; }
+  remember(copy(state.positions));
+  const review = ensureGroups(), number = review.nextGroup || 1;
+  review.nextGroup = number + 1;
+  review.groups.push({ id: crypto.randomUUID(), name, tone: [0, 1, 2, 3].find(tone => !review.groups.some(group => group.tone === tone)) ?? number % 4, cardIds: [detailCardId] });
+  refreshSingles(); closeCardDetail(); invalidate(); paint(); save(); announce('한 장짜리 그룹을 만들었다.');
+});
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !detailPanel.hidden) { event.preventDefault(); closeCardDetail(true); } });
+window.visualViewport?.addEventListener('resize', positionCardDetail);
+
 function renderCards() {
-  cardsElement.innerHTML = catalog.map(card => `<div class="card" tabindex="0" role="button" aria-label="${escape(card.name)}. 끌거나 방향키로 이동" data-id="${card.id}"><span>${escape(card.name)}</span></div>`).join('');
+  cardsElement.innerHTML = catalog.map(card => `<div class="card" tabindex="0" role="button" aria-label="${escape(card.name)}. 눌러서 설명 보기, 끌어서 이동" data-id="${card.id}"><span>${escape(card.name)}</span></div>`).join('');
   paint();
 }
 function paint() {
@@ -494,6 +592,7 @@ function stopAnimation() { if (animation) cancelAnimationFrame(animation); anima
 
 viewport.addEventListener('pointerdown', event => {
   if (event.button !== 0 || reviewDialog.open || pointers.size >= 2) return;
+  closeCardDetail();
   cancelHold();
   hint.classList.add('hidden');
   event.preventDefault();
@@ -547,6 +646,7 @@ viewport.addEventListener('pointermove', event => {
 }, { passive: false });
 
 function finishPointer(event, cancelled = false) {
+  let showDetail = null;
   if (!pointers.has(event.pointerId)) return;
   cancelHold();
   pointers.delete(event.pointerId);
@@ -569,10 +669,12 @@ function finishPointer(event, cancelled = false) {
       }
       else if (gesture.type === 'card') {
         if (lastTap?.id === gesture.id && Date.now() - lastTap.time < 330) focusCard(gesture.id);
+        else showDetail = gesture.id;
         lastTap = { id: gesture.id, time: Date.now() };
       }
     }
     gesture = null; paint(); save();
+    if (showDetail) openCardDetail(showDetail);
   }
 }
 viewport.addEventListener('pointerup', event => finishPointer(event));
@@ -583,6 +685,7 @@ window.addEventListener('blur', () => {
 });
 viewport.addEventListener('contextmenu', event => event.preventDefault());
 viewport.addEventListener('wheel', event => {
+  closeCardDetail();
   event.preventDefault(); hint.classList.add('hidden');
   const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
   const delta = clamp(event.deltaY * unit, -240, 240);
@@ -592,6 +695,7 @@ viewport.addEventListener('wheel', event => {
 }, { passive: false });
 viewport.addEventListener('keydown', event => {
   const id = event.target.closest('.card')?.dataset.id;
+  if (id && !gesture && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openCardDetail(id); return; }
   const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
   if (!id || !directions[event.key] || gesture) return;
   event.preventDefault();
@@ -665,6 +769,7 @@ document.addEventListener('click', event => {
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled) return;
   const action = button.dataset.action;
+  closeCardDetail();
   if (action === 'reset-test') resetTest();
   else if (action === 'fit') fitAll();
   else if (action === 'undo' && history.length) {
@@ -690,6 +795,6 @@ reviewDialog.addEventListener('input', event => {
   const group = state.review.groups.find(g => g.id === event.target.dataset.groupName);
   if (group) { future = []; group.name = event.target.value; state.confirmed = false; drawOutlines(); updateControls(); save(); }
 });
-window.addEventListener('resize', paint);
+window.addEventListener('resize', () => { paint(); positionCardDetail(); });
 setTimeout(() => hint.classList.add('hidden'), 6500);
 renderCards(); drawOutlines(); save();

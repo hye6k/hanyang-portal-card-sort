@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow">
   <title>자유 배치 카드 소팅 · 병합 자동 정렬 · 충돌</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=snap-collision-9">
+  <link rel="stylesheet" href="./style.css?v=snap-collision-10">
 </head>
 <body>
   <main id="viewport" aria-label="카드를 자유롭게 배치하는 평면"><div id="world"><div id="outlines"></div><div id="cards"></div></div></main>
@@ -19,10 +19,21 @@
     <span class="divider" aria-hidden="true"></span><button type="button" data-action="review" class="review-button">묶음 확인</button>
   </nav>
   <button type="button" data-action="reset-test" class="reset-test" title="배치와 분류를 지우고 다시 시작" aria-label="저장된 테스트 배치와 분류 초기화">초기화</button>
+  <section id="card-detail" class="card-detail" role="dialog" aria-modal="false" aria-labelledby="detail-title" aria-describedby="detail-description" hidden>
+    <button type="button" class="detail-close" id="close-card-detail" aria-label="설명 닫기">×</button>
+    <h2 id="detail-title"></h2>
+    <p id="detail-description"></p>
+    <button type="button" class="detail-create" id="start-single-group">이 카드로 그룹 만들기</button>
+    <form id="single-group-form" hidden>
+      <label for="single-group-name">그룹 이름</label>
+      <div class="single-group-row"><input id="single-group-name" type="text" maxlength="60" autocomplete="off" aria-describedby="single-group-error"><button type="submit">만들기</button></div>
+      <p id="single-group-error" class="single-group-error" role="alert" hidden></p>
+    </form>
+  </section>
   <dialog id="review" aria-label="묶음 확인"></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <noscript>카드를 배치하려면 JavaScript를 사용할 수 있어야 한다.</noscript>
-  <script type="module" src="./app.js?v=snap-collision-9"></script>
+  <script type="module" src="./app.js?v=snap-collision-10"></script>
 </body>
 </html>
