@@ -286,15 +286,10 @@ function applySnap(plan) {
   for (const id of plan.ids) Object.assign(state.positions[id], plan.placements[id]);
 }
 function chooseGrid(count) {
-  let best = null;
-  for (let cols = count >= 4 ? 2 : 1; cols <= count; cols++) {
-    const rows = Math.ceil(count / cols), empty = cols * rows - count;
-    const width = cols * CARD_W + (cols - 1) * SNAP_GAP;
-    const height = rows * CARD_H + (rows - 1) * SNAP_GAP;
-    const score = Math.abs(Math.log(width / height)) + (empty ? .8 + empty / count * 1.5 : 0);
-    if (!best || score < best.score) best = { cols, rows, width, height, score };
-  }
-  return best;
+  const stages = [[3, 1], [8, 2], [15, 3], [24, 4], [Infinity, 5]];
+  const cols = stages.find(([limit]) => count <= limit)[1];
+  const rows = Math.ceil(count / cols);
+  return { cols, rows, width: cols * CARD_W + (cols - 1) * SNAP_GAP, height: rows * CARD_H + (rows - 1) * SNAP_GAP };
 }
 function arrangementOrigin(grid, ids) {
   const members = new Set(ids), points = ids.map(id => state.positions[id]);
