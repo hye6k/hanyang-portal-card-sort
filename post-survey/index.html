@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f2f5f8">
+  <meta name="robots" content="noindex,nofollow">
+  <title>카드 분류 후 설문</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css?v=post-1">
+</head>
+<body>
+  <a class="skip-link" href="#post-form">설문으로 이동</a>
+  <main class="page">
+    <header class="page-heading"><h1>카드 분류 후 설문</h1></header>
+    <details class="sort-reference"><summary>내 분류 결과</summary><div id="sort-result"></div></details>
+    <form id="post-form" novalidate>
+      <fieldset id="response-fields" class="response-fields"><legend class="sr-only">카드 분류 후 설문</legend>
+        <section class="question" data-question="difficult" aria-labelledby="difficult-title">
+          <div class="question-heading"><h2 id="difficult-title"><span class="question-number">01</span>어떤 기능을 분류하기 어려웠나요?</h2></div>
+          <p class="question-hint">최대 3개까지 선택할 수 있습니다.</p>
+          <label class="choice none-choice"><input type="checkbox" name="difficult_none"><span>어려웠던 기능 없음</span></label>
+          <fieldset class="card-options" id="difficult-cards" aria-labelledby="difficult-title" aria-describedby="difficult-error"><legend class="sr-only">분류하기 어려웠던 카드</legend></fieldset>
+          <p class="field-error" id="difficult-error" hidden></p>
+        </section>
+        <section class="question" id="difficult-reasons-section" aria-labelledby="difficult-reasons-title" hidden>
+          <div class="question-heading"><h2 id="difficult-reasons-title"><span class="question-number">02</span>선택한 기능을 분류하기 어려웠던 이유는 무엇인가요?</h2></div>
+          <div id="difficult-reasons"></div>
+        </section>
+        <section class="question" data-question="clarity" aria-labelledby="clarity-title">
+          <div class="question-heading"><h2 id="clarity-title"><span class="question-number">03</span>카드에 적힌 명칭만으로 기능을 이해할 수 있었나요?</h2></div>
+          <fieldset class="scale" id="clarity-options" aria-labelledby="clarity-title" aria-describedby="clarity-error"><legend class="sr-only">명칭으로 기능을 이해할 수 있었던 정도</legend></fieldset>
+          <p class="field-error" id="clarity-error" hidden></p>
+        </section>
+        <section class="question" data-question="naming" aria-labelledby="naming-title">
+          <div class="question-heading"><h2 id="naming-title"><span class="question-number">04</span>명칭만으로 기능을 이해하기 어려웠던 카드는 무엇인가요?</h2></div>
+          <label class="choice none-choice"><input type="checkbox" name="naming_none"><span>해당 없음</span></label>
+          <fieldset class="card-options" id="naming-cards" aria-labelledby="naming-title" aria-describedby="naming-error"><legend class="sr-only">명칭을 이해하기 어려웠던 카드</legend></fieldset>
+          <p class="field-error" id="naming-error" hidden></p>
+        </section>
+        <section class="question" id="naming-reasons-section" aria-labelledby="naming-reasons-title" hidden>
+          <div class="question-heading"><h2 id="naming-reasons-title"><span class="question-number">05</span>해당 카드의 명칭을 이해하기 어려웠던 이유는 무엇인가요?</h2></div>
+          <div id="naming-reasons"></div>
+        </section>
+        <section class="question" data-question="criterion" aria-labelledby="criterion-title">
+          <div class="question-heading"><h2 id="criterion-title"><span class="question-number">06</span>기능을 그룹으로 묶을 때 가장 중요하게 생각한 기준은 무엇인가요?</h2></div>
+          <fieldset class="options" id="criterion-options" aria-labelledby="criterion-title" aria-describedby="criterion-error"><legend class="sr-only">가장 중요하게 생각한 분류 기준</legend></fieldset>
+          <div class="other-field" id="criterion-other-field" hidden><label for="criterion-other">기타 기준</label><textarea id="criterion-other" rows="3" maxlength="800" placeholder="분류 기준을 작성해 주세요." aria-describedby="criterion-error" disabled></textarea></div>
+          <p class="field-error" id="criterion-error" hidden></p>
+        </section>
+        <section class="consent-area" data-question="consent"><p>응답과 분류 결과는 포털 메뉴 연구에 사용합니다.</p><label class="check-option consent-option"><input type="checkbox" name="consent" aria-describedby="consent-error"><span>응답 제출에 동의합니다.</span></label><p class="field-error" id="consent-error" hidden></p></section>
+      </fieldset>
+      <p id="validation-summary" class="validation-summary" role="alert" hidden></p>
+      <p id="pending-note" class="pending-note" hidden>전송할 응답을 보관하고 있습니다. 다시 제출하면 같은 내용으로 재시도합니다.</p>
+      <p id="submit-error" class="submit-error" role="alert" hidden></p>
+      <div class="submit-bar"><button type="submit" class="primary-button" id="submit-button">응답 제출</button></div>
+    </form>
+    <section class="complete-panel" id="complete-panel" hidden><span class="complete-check" aria-hidden="true">✓</span><h2 tabindex="-1" id="complete-title">응답이 저장되었습니다.</h2><p>참여해 주셔서 감사합니다.<br>이 창을 닫으셔도 됩니다.</p><span class="complete-note">시험 응답으로 구분해 저장했습니다.</span></section>
+  </main>
+  <div class="sr-only" id="announcer" aria-live="polite"></div>
+  <noscript>응답하려면 브라우저에서 JavaScript를 허용해 주세요.</noscript>
+  <script type="module" src="./app.js?v=post-1"></script>
+</body>
+</html>
