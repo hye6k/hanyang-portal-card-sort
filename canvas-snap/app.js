@@ -1,10 +1,6 @@
 import { cardNames } from '../test/cards.js';
 
 const CARD_W = 144, CARD_H = 70, GAP = 24;
-const CARD_CLEARANCE = 8;
-const COLLISION_RADIUS = 16;
-// Whole groups stay farther apart than both proximity links and outline padding.
-const GROUP_CLEARANCE = 44;
 const catalog = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name }));
 const viewport = document.querySelector('#viewport');
 const world = document.querySelector('#world');
@@ -124,7 +120,6 @@ function paint() {
     const inGroup = gesture?.type === 'group' && gesture.ids.includes(card.id);
     el.classList.toggle('moving', isCardGesture() && gesture.moved && (gesture.id === card.id || inGroup));
     el.classList.toggle('group-held', inGroup);
-    el.classList.toggle('pushed', isCardGesture() && gesture.pushed?.has(card.id));
     el.classList.toggle('magnet-target', !!snap?.targetIds.includes(card.id));
   }
   drawOutlines();
@@ -247,71 +242,41 @@ function focusCard(id) {
 }
 
 const SNAP_GAP = 12;
-function boundsOf(ids) {
-  const points = ids.map(id => state.positions[id]);
-  const left = Math.min(...points.map(p => p.x)), top = Math.min(...points.map(p => p.y));
-  const right = Math.max(...points.map(p => p.x + CARD_W)), bottom = Math.max(...points.map(p => p.y + CARD_H));
-  return { left, top, right, bottom, cx: (left + right) / 2, cy: (top + bottom) / 2 };
-}
-function nearestAssignment(ids, cells) {
-  const pairs = [];
-  ids.forEach(id => cells.forEach((cell, index) => pairs.push({ id, index, distance: (state.positions[id].x - cell.x) ** 2 + (state.positions[id].y - cell.y) ** 2 })));
-  pairs.sort((a, b) => a.distance - b.distance);
-  const usedIds = new Set(), usedCells = new Set(), placements = {};
-  let cost = 0;
-  for (const pair of pairs) if (!usedIds.has(pair.id) && !usedCells.has(pair.index)) {
-    placements[pair.id] = cells[pair.index]; cost += pair.distance;
-    usedIds.add(pair.id); usedCells.add(pair.index);
-  }
-  return { placements, cost };
-}
 function makeSnapPlan() {
   const activeIds = gesture.type === 'group' ? gesture.ids : [gesture.id];
-  const active = boundsOf(activeIds);
-  let target = null, bestDistance = Infinity, bestCenter = Infinity;
+  const activeSet = new Set(activeIds);
+  const stationary = catalog.filter(card => !activeSet.has(card.id));
   const threshold = gesture.type === 'group' ? 52 : 28;
-  for (const group of gesture.others) {
-    let distance = Infinity;
-    for (const id of activeIds) for (const otherId of group.cardIds) {
-      const a = state.positions[id], b = state.positions[otherId];
-      distance = Math.min(distance, Math.hypot(Math.max(0, a.x - b.x - CARD_W, b.x - a.x - CARD_W), Math.max(0, a.y - b.y - CARD_H, b.y - a.y - CARD_H)));
+  const objects = stationary.map(card => {
+    const target = state.positions[card.id];
+    let nearest = null;
+    for (const id of activeIds) {
+      const p = state.positions[id];
+      const distance = Math.hypot(Math.max(0, p.x - target.x - CARD_W, target.x - p.x - CARD_W), Math.max(0, p.y - target.y - CARD_H, target.y - p.y - CARD_H));
+      const center = Math.hypot(p.x - target.x, p.y - target.y);
+      if (!nearest || distance < nearest.distance || distance === nearest.distance && center < nearest.center) nearest = { id, distance, center };
     }
-    const b = boundsOf(group.cardIds), center = Math.hypot(active.cx - b.cx, active.cy - b.cy);
-    if (distance <= threshold && (distance < bestDistance || distance === bestDistance && center < bestCenter)) {
-      target = group; bestDistance = distance; bestCenter = center;
+    return { card, target, ...nearest };
+  }).filter(object => object.distance <= threshold).sort((a, b) => a.distance - b.distance || a.center - b.center);
+  for (const object of objects) {
+    const target = object.target, anchor = state.positions[object.id];
+    const slots = [
+      { side: 'left', x: target.x - CARD_W - SNAP_GAP, y: target.y },
+      { side: 'right', x: target.x + CARD_W + SNAP_GAP, y: target.y },
+      { side: 'top', x: target.x, y: target.y - CARD_H - SNAP_GAP },
+      { side: 'bottom', x: target.x, y: target.y + CARD_H + SNAP_GAP }
+    ].sort((a, b) => Math.hypot(a.x - anchor.x, a.y - anchor.y) - Math.hypot(b.x - anchor.x, b.y - anchor.y));
+    for (const slot of slots) {
+      const dx = slot.x - anchor.x, dy = slot.y - anchor.y;
+      const placements = Object.fromEntries(activeIds.map(id => [id, { x: state.positions[id].x + dx, y: state.positions[id].y + dy }]));
+      const free = Object.values(placements).every(p => p.x >= -10000 && p.x <= 10000 && p.y >= -10000 && p.y <= 10000 && stationary.every(card => {
+        const other = state.positions[card.id];
+        return p.x + CARD_W <= other.x + .001 || other.x + CARD_W <= p.x + .001 || p.y + CARD_H <= other.y + .001 || other.y + CARD_H <= p.y + .001;
+      }));
+      if (free) return { side: slot.side, placements, activeIds: [...activeIds], targetIds: [object.card.id], ids: [...activeIds] };
     }
   }
-  if (!target) return null;
-  const b = boundsOf(target.cardIds);
-  const edges = [
-    { side: 'left', x: b.left - SNAP_GAP - CARD_W / 2, y: clamp(active.cy, b.top + CARD_H / 2, b.bottom - CARD_H / 2) },
-    { side: 'right', x: b.right + SNAP_GAP + CARD_W / 2, y: clamp(active.cy, b.top + CARD_H / 2, b.bottom - CARD_H / 2) },
-    { side: 'top', x: clamp(active.cx, b.left + CARD_W / 2, b.right - CARD_W / 2), y: b.top - SNAP_GAP - CARD_H / 2 },
-    { side: 'bottom', x: clamp(active.cx, b.left + CARD_W / 2, b.right - CARD_W / 2), y: b.bottom + SNAP_GAP + CARD_H / 2 }
-  ];
-  edges.sort((a, c) => Math.hypot(a.x - active.cx, a.y - active.cy) - Math.hypot(c.x - active.cx, c.y - active.cy));
-  const side = edges[0].side, horizontal = side === 'left' || side === 'right';
-  const count = activeIds.length + target.cardIds.length;
-  let best = null;
-  for (let cols = 1; cols <= Math.min(6, count); cols++) {
-    const rows = Math.ceil(count / cols);
-    if (horizontal && (cols < 2 || Math.ceil(count / rows) !== cols) || !horizontal && rows < 2) continue;
-    const width = cols * CARD_W + (cols - 1) * SNAP_GAP, height = rows * CARD_H + (rows - 1) * SNAP_GAP;
-    const left = side === 'right' ? b.left : side === 'left' ? b.right - width : b.cx - width / 2;
-    const top = side === 'bottom' ? b.top : side === 'top' ? b.bottom - height : b.cy - height / 2;
-    let cells = [];
-    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) cells.push({ x: left + col * (CARD_W + SNAP_GAP), y: top + row * (CARD_H + SNAP_GAP) });
-    const edgeOrder = cell => side === 'left' ? -cell.x : side === 'right' ? cell.x : side === 'top' ? -cell.y : cell.y;
-    cells.sort((a, c) => edgeOrder(a) - edgeOrder(c) || (horizontal ? Math.abs(a.y + CARD_H / 2 - active.cy) - Math.abs(c.y + CARD_H / 2 - active.cy) : Math.abs(a.x + CARD_W / 2 - active.cx) - Math.abs(c.x + CARD_W / 2 - active.cx)) || a.y - c.y || a.x - c.x);
-    cells = cells.slice(0, count);
-    const activeCells = [...cells].sort((a, c) => edgeOrder(c) - edgeOrder(a) || Math.hypot(a.x + CARD_W / 2 - active.cx, a.y + CARD_H / 2 - active.cy) - Math.hypot(c.x + CARD_W / 2 - active.cx, c.y + CARD_H / 2 - active.cy)).slice(0, activeIds.length);
-    const activeSet = new Set(activeCells);
-    const targetCells = cells.filter(cell => !activeSet.has(cell));
-    const existing = nearestAssignment(target.cardIds, targetCells), moving = nearestAssignment(activeIds, activeCells);
-    const cost = existing.cost + moving.cost * .7 + count * CARD_H ** 2 * Math.abs(Math.log(width / height)) + (cols * rows - count) * CARD_H ** 2 * .8;
-    if (!best || cost < best.cost) best = { cost, cols, rows, side, placements: { ...existing.placements, ...moving.placements }, activeIds: [...activeIds], targetIds: [...target.cardIds], ids: [...target.cardIds, ...activeIds] };
-  }
-  return best;
+  return null;
 }
 function drawSnapGuide(plan) {
   if (!plan) { snapGuide.innerHTML = ''; return; }
@@ -322,8 +287,6 @@ function drawSnapGuide(plan) {
 }
 function applySnap(plan) {
   for (const id of plan.ids) Object.assign(state.positions[id], plan.placements[id]);
-  gesture.type = 'group'; gesture.ids = plan.ids; gesture.others = movementGroups(plan.ids);
-  pushNeighbours();
   for (const id of plan.ids) {
     const el = cardsElement.querySelector(`[data-id="${id}"]`);
     el.classList.add('snap-settling');
@@ -337,29 +300,12 @@ function updateCard(point) {
     const dx = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x - gesture.original.x, -10000 - Math.min(...originals.map(p => p.x)), 10000 - Math.max(...originals.map(p => p.x)));
     const dy = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y - gesture.original.y, -10000 - Math.min(...originals.map(p => p.y)), 10000 - Math.max(...originals.map(p => p.y)));
     for (const id of gesture.ids) { state.positions[id].x = gesture.snapshot[id].x + dx; state.positions[id].y = gesture.snapshot[id].y + dy; }
-    pushNeighbours(makeSnapPlan()?.targetIds || []);
     return;
   }
   const p = state.positions[gesture.id];
   p.x = clamp((point.x - state.view.x) / state.view.scale - gesture.offset.x, -10000, 10000);
   p.y = clamp((point.y - state.view.y) / state.view.scale - gesture.offset.y, -10000, 10000);
-  pushNeighbours(makeSnapPlan()?.targetIds || []);
 }
-function collisionContact(a, b, clearance) {
-  // Minkowski sum of two rounded cards plus the requested separation.
-  const dx = a.x - b.x, dy = a.y - b.y;
-  const qx = Math.abs(dx) - (CARD_W - 2 * COLLISION_RADIUS);
-  const qy = Math.abs(dy) - (CARD_H - 2 * COLLISION_RADIUS);
-  const radius = 2 * COLLISION_RADIUS + clearance;
-  const outsideX = Math.max(qx, 0), outsideY = Math.max(qy, 0);
-  const length = Math.hypot(outsideX, outsideY);
-  const distance = length + Math.min(Math.max(qx, qy), 0) - radius;
-  if (distance >= -.001) return null;
-  const sx = dx < 0 ? -1 : 1, sy = dy < 0 ? -1 : 1;
-  if (length > .0001) return { depth: -distance, nx: sx * outsideX / length, ny: sy * outsideY / length };
-  return qx > qy ? { depth: -distance, nx: sx, ny: 0 } : { depth: -distance, nx: 0, ny: sy };
-}
-function overlaps(a, b, clearance = 0) { return collisionContact(a, b, clearance) !== null; }
 function movementGroups(activeIds) {
   if (!state.confirmed || !state.review) return spatialClusters(activeIds).map(cardIds => ({ cardIds }));
   const excluded = new Set(activeIds);
@@ -367,64 +313,6 @@ function movementGroups(activeIds) {
   const assigned = new Set([...activeIds, ...groups.flatMap(group => group.cardIds)]);
   for (const card of catalog) if (!assigned.has(card.id)) groups.push({ cardIds: [card.id] });
   return groups;
-}
-function pushOffset(ids, blockers) {
-  const members = ids.map(id => state.positions[id]);
-  const pairs = blockers.flatMap(blocker => blocker.cardIds.map(id => ({ position: state.positions[id], clearance: blocker.active && gesture.type === 'card' ? CARD_CLEARANCE : GROUP_CLEARANCE })));
-  function deepest(dx, dy) {
-    let contact = null;
-    for (const p of members) for (const pair of pairs) {
-      const candidate = collisionContact({ x: p.x + dx, y: p.y + dy }, pair.position, pair.clearance);
-      if (candidate && (!contact || candidate.depth > contact.depth)) contact = candidate;
-    }
-    return contact;
-  }
-  let dx = 0, dy = 0;
-  for (let i = 0; i < 24; i++) {
-    const contact = deepest(dx, dy);
-    if (!contact) return { dx, dy };
-    dx += contact.nx * (contact.depth + .02);
-    dy += contact.ny * (contact.depth + .02);
-  }
-  // A concave pocket can give opposing contact normals. Search several escape
-  // directions only in that case, keeping the entire group rigid.
-  let best = null;
-  for (let i = 0; i < 32; i++) {
-    const nx = Math.cos(i * Math.PI / 16), ny = Math.sin(i * Math.PI / 16);
-    let high = 8;
-    while (deepest(nx * high, ny * high)) high *= 2;
-    let low = 0;
-    for (let step = 0; step < 16; step++) {
-      const middle = (low + high) / 2;
-      if (deepest(nx * middle, ny * middle)) low = middle;
-      else high = middle;
-    }
-    const distance = high + .03;
-    if ((!best || distance < best.distance) && !deepest(nx * distance, ny * distance)) best = { dx: nx * distance, dy: ny * distance, distance };
-  }
-  return best;
-}
-function pushNeighbours(anchorIds = []) {
-  const activeIds = gesture.type === 'group' ? gesture.ids : [gesture.id];
-  const placed = [{ cardIds: activeIds, active: true }];
-  if (anchorIds.length) placed.push({ cardIds: anchorIds, active: false });
-  const remaining = gesture.others.filter(group => !group.cardIds.some(id => anchorIds.includes(id)));
-  // Each encountered group becomes a fixed obstacle for the next one. The held
-  // object follows the pointer; contact propagates outward without bouncing back.
-  while (remaining.length) {
-    const index = remaining.findIndex(group => group.cardIds.some(id => placed.some(blocker => {
-      const clearance = blocker.active && gesture.type === 'card' ? CARD_CLEARANCE : GROUP_CLEARANCE;
-      return blocker.cardIds.some(other => overlaps(state.positions[id], state.positions[other], clearance));
-    })));
-    if (index < 0) break;
-    const group = remaining.splice(index, 1)[0];
-    const offset = pushOffset(group.cardIds, placed);
-    if (offset) for (const id of group.cardIds) {
-      state.positions[id].x += offset.dx; state.positions[id].y += offset.dy;
-      gesture.pushed.add(id);
-    }
-    placed.push(group);
-  }
 }
 function edgePan() {
   if (!isCardGesture() || !gesture.moved) return;
@@ -462,7 +350,7 @@ viewport.addEventListener('pointerdown', event => {
     cardsElement.querySelector(`[data-id="${id}"]`).classList.remove('settling', 'snap-settling');
     const original = { ...state.positions[id] };
     selectedId = id;
-    gesture = { type: 'card', id, start, original, snapshot: copy(state.positions), others: movementGroups([id]), pushed: new Set(), moved: false, offset: { x: (start.x - state.view.x) / state.view.scale - original.x, y: (start.y - state.view.y) / state.view.scale - original.y } };
+    gesture = { type: 'card', id, start, original, snapshot: copy(state.positions), others: movementGroups([id]), moved: false, offset: { x: (start.x - state.view.x) / state.view.scale - original.x, y: (start.y - state.view.y) / state.view.scale - original.y } };
     armGroupHold();
   } else { selectedId = null; gesture = { type: 'pan', start, view: { ...state.view } }; }
   paint();
@@ -509,7 +397,6 @@ function finishPointer(event, cancelled = false) {
     if (isCardGesture()) {
       if (cancelled) restoreDrag();
       else if (gesture.moved) {
-        pushNeighbours(makeSnapPlan()?.targetIds || []);
         const wasGroup = gesture.type === 'group';
         const snap = makeSnapPlan();
         if (snap) applySnap(snap);
@@ -546,11 +433,11 @@ viewport.addEventListener('keydown', event => {
   event.preventDefault();
   const snapshot = copy(state.positions);
   remember(snapshot);
-  gesture = { type: 'card', id, snapshot, others: movementGroups([id]), pushed: new Set() };
+  gesture = { type: 'card', id, snapshot, others: movementGroups([id]) };
   const [dx, dy] = directions[event.key];
   state.positions[id].x += dx * (event.shiftKey ? 40 : 12);
   state.positions[id].y += dy * (event.shiftKey ? 40 : 12);
-  pushNeighbours(); gesture = null;
+  gesture = null;
   invalidate(); paint(); save(); announce(`${cardName(id)} 위치 이동`);
 });
 viewport.addEventListener('focusin', event => {
