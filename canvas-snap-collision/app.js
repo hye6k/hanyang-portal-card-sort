@@ -1,4 +1,4 @@
-import { integrated, urls } from '../study/flow.js?v=journey-2';
+import { integrated, urls } from '../study/flow.js?v=journey-3';
 import { cardNames } from '../test/cards.js';
 
 const practice = new URLSearchParams(location.search).get('practice') === '1';
@@ -799,7 +799,7 @@ document.addEventListener('click', event => {
     state.confirmed = true; state.confirmedAt = new Date().toISOString();
     reviewDialog.close(); drawOutlines(); updateControls(); save();
     if (practice) { window.dispatchEvent(new Event('practice-finished')); return; }
-    location.assign(integrated ? urls['post-1'] : '../post-survey/?stage=select&from=canvas&v=flow-8');
+    location.assign(integrated ? urls['post-1'] : '../post-survey/?stage=groups&from=canvas&v=journey-3');
   }
 });
 reviewDialog.addEventListener('input', event => {
