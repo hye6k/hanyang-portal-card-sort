@@ -1,20 +1,32 @@
 import {integrated} from './flow.js?v=journey-3';
 const practice=new URLSearchParams(location.search).get('practice')==='1';
-const actual=new URL(location.href);actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','journey-3');
+const actual=new URL(location.href);actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','tutorial-actions-1');
 const training=new URL(actual);training.searchParams.set('practice','1');
-const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=journey-3';document.head.append(css);
-if(!practice){const help=document.createElement('button');help.className='practice-help';help.textContent='사용 방법';help.addEventListener('click',()=>location.assign(training));document.body.append(help);}
-else{
+const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=tutorial-actions-1';document.head.append(css);
+if(!practice){
+ const help=document.createElement('button');help.className='practice-help';help.textContent='사용 방법';help.addEventListener('click',()=>location.assign(training));document.body.append(help);
+}else{
  document.body.classList.add('practice-mode');
- const panel=document.createElement('section');panel.className='practice-guide';panel.setAttribute('aria-label','카드 분류 조작 연습');document.body.append(panel);
  const steps=[
- ['화면을 움직여 보세요','빈 배경을 끌어 이동해 보세요. 휴대전화는 두 손가락으로, PC는 마우스 휠로 확대·축소합니다.','전체 보기를 누르면 모든 카드가 보이는 화면으로 돌아옵니다.'],
- ['카드를 눌러 보세요','연필 카드를 한 번 눌러 설명을 확인해 보세요. 이 카드만으로 그룹을 만들려면 설명창의 ‘이 카드로 그룹 만들기’를 누르면 됩니다.','그룹 이름을 입력하고 만들기를 눌러 보세요. 이름을 비워 두어도 임시 이름이 붙습니다.'],
- ['카드를 옮겨 그룹을 만들어 보세요','사과를 바나나 가까이에 놓아 그룹을 만들고, 한 장을 빈 곳으로 빼보세요. 기존 그룹에 카드를 추가할 때도 같은 방법입니다.','하단의 말린 화살표로 실행 취소와 다시 실행을 해보세요.'],
- ['그룹 전체를 옮겨 보세요','그룹 속 카드 하나를 0.5초 꾹 누른 뒤 끌어 보세요. 카드 한 장 대신 그룹 전체가 함께 움직입니다.','그룹 확인을 열어 그룹 이름과 소속 카드를 살펴보고 완료를 눌러 주세요.']
+  {title:'화면을 움직여 보세요',text:'빈 배경을 끌어 이동하고, 화면을 확대·축소해 보세요.',tasks:[[['pan'],'빈 배경을 끌어 이동하기'],[['zoom'],'두 손가락 또는 마우스 휠로 확대·축소하기'],[['fit'],'하단의 전체 보기로 돌아오기']],tip:'카드 위를 끌면 카드가 움직입니다. 화면 이동은 빈 배경에서 시작하세요.',focus:['fit']},
+  {title:'카드를 눌러 확인해 보세요',text:'연필 카드를 짧게 눌러 설명을 읽고, 이 카드로 그룹을 만들어 보세요.',tasks:[[['description'],'카드를 눌러 설명 확인하기'],[['singleton'],'이 카드로 그룹 만들기 → 이름 입력 → 만들기']],tip:'한 장만으로도 그룹을 만들 수 있습니다. 이름을 비워 두면 임시 이름이 붙습니다.',focus:[]},
+  {title:'카드를 합치고 빼보세요',text:'사과를 바나나 가까이에 놓아 묶은 뒤, 한 장을 빈 곳으로 끌어내 보세요.',tasks:[[['merge'],'카드를 다른 카드나 그룹 가까이에 놓기'],[['split'],'그룹 속 카드 한 장을 밖으로 끌어내기'],[['undo','redo'],'하단 화살표로 실행 취소하고 다시 실행하기']],tip:'합쳐질 카드들이 공통 윤곽으로 표시되면 손을 놓으세요.',focus:['undo','redo']},
+  {title:'그룹을 옮기고 수정해 보세요',text:'그룹 속 카드를 0.5초 꾹 눌러 함께 옮긴 뒤, 짧게 눌러 편집해 보세요.',tasks:[[['group_move'],'0.5초 꾹 누른 채 끌어 그룹 전체 이동하기'],[['rename'],'카드 짧게 누르기 → 소속 그룹 이름 변경'],[['detach'],'카드 짧게 누르기 → 이 카드를 그룹에서 빼기']],tip:'마지막에 그룹 확인을 열어 이름과 소속을 점검하세요. 그룹이 없다면 사과와 바나나를 다시 묶어 보세요.',focus:['review']}
  ];
- let index=0;function render(){panel.innerHTML=`<div class="practice-guide-heading"><span>조작 연습 ${index+1} / ${steps.length}</span><span>연습 내용은 응답에 포함되지 않습니다.</span></div><h2>${steps[index][0]}</h2><p>${steps[index][1]}</p><p class="practice-tip">${steps[index][2]}</p><div class="practice-guide-actions"><button type="button" data-practice="back" ${index===0?'disabled':''}>이전</button><button type="button" data-practice="next">${index===steps.length-1?'그룹 확인하기':'다음'}</button></div>`;}
- panel.addEventListener('click',e=>{const action=e.target.dataset.practice;if(action==='back'&&index>0){index--;render();}if(action==='next'){if(index<steps.length-1){index++;render();}else document.querySelector('[data-action=review]').click();}});render();
+ const panel=document.createElement('section');panel.className='practice-guide';panel.setAttribute('aria-label','카드 분류 조작 연습');document.body.append(panel);
+ let index=0;let folded=false;const completed=new Set();
+ const details=document.querySelector('#card-detail');
+ function updateChecks(){panel.querySelectorAll('[data-practice-task]').forEach(el=>{const task=steps[index].tasks[Number(el.dataset.practiceTask)];const done=task[0].every(action=>completed.has(action));el.classList.toggle('is-done',done);el.querySelector('[data-task-mark]').textContent=done?'✓':'○';el.querySelector('[data-task-mark]').setAttribute('aria-label',done?'완료':'미완료');});}
+ function updateDetail(){const open=!details.hidden;document.body.classList.toggle('practice-detail-open',open);let text='';if(open){if(!document.querySelector('#rename-group-form').hidden)text='소속 그룹의 이름을 바꾸고 저장을 눌러 보세요.';else if(!document.querySelector('#single-group-form').hidden)text='그룹 이름을 입력하고 만들기를 눌러 보세요.';else if(!document.querySelector('#group-card-actions').hidden)text='소속 그룹 이름을 바꾸거나, 이 카드만 그룹에서 빼보세요.';else text='설명을 읽고 이 카드로 그룹 만들기를 눌러 보세요.';}panel.querySelector('.practice-detail-instruction').textContent=text;}
+ function render(){folded=false;document.body.classList.remove('practice-guide-folded');panel.innerHTML=`<div class="practice-guide-heading"><span>조작 연습 ${index+1} / ${steps.length}</span><button type="button" data-practice="toggle" aria-expanded="true">안내 접기</button></div><h2>${steps[index].title}</h2><p>${steps[index].text}</p><ul class="practice-tasks">${steps[index].tasks.map((task,i)=>`<li data-practice-task="${i}"><span data-task-mark></span><span>${task[1]}</span></li>`).join('')}</ul><p class="practice-tip">${steps[index].tip}</p><p class="practice-detail-instruction" aria-live="polite"></p><div class="practice-guide-actions"><button type="button" data-practice="back" ${index===0?'disabled':''}>이전</button><button type="button" data-practice="next">${index===steps.length-1?'그룹 확인하기':'다음'}</button></div>`;
+ document.querySelectorAll('.practice-target').forEach(el=>el.classList.remove('practice-target'));for(const action of steps[index].focus)document.querySelector(`[data-action="${action}"]`)?.classList.add('practice-target');if(index===1)document.querySelector('[data-id="card-3"]')?.classList.add('practice-target');updateChecks();updateDetail();if(index>0)document.querySelector('[data-action=fit]').click();}
+ panel.addEventListener('click',e=>{const action=e.target.dataset.practice;if(!action)return;if(action==='toggle'){setFolded(!folded);return;}document.querySelector('#close-card-detail').click();if(action==='back'&&index>0){index--;render();}if(action==='next'){if(index<steps.length-1){index++;render();}else document.querySelector('[data-action=review]').click();}});
+ function setFolded(value){folded=value;document.body.classList.toggle('practice-guide-folded',folded);const button=panel.querySelector('[data-practice=toggle]');button.textContent=folded?'안내 펼치기':'안내 접기';button.setAttribute('aria-expanded',String(!folded));}
+ let start=null;const viewport=document.querySelector('#viewport');viewport.addEventListener('pointerdown',e=>{start={x:e.clientX,y:e.clientY};});viewport.addEventListener('pointermove',e=>{if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>4)setFolded(true);});window.addEventListener('pointerup',()=>{start=null;});window.addEventListener('pointercancel',()=>{start=null;});
+ window.addEventListener('practice-action',e=>{completed.add(e.detail);updateChecks();});
+ new MutationObserver(updateDetail).observe(details,{attributes:true,attributeFilter:['hidden'],subtree:true});
  const end=document.createElement('dialog');end.className='practice-end';end.innerHTML='<h2>연습을 마쳤습니다.</h2><p>실제 카드로 자유롭게 분류해 보세요.<br>사용 방법은 분류 중에도 다시 열 수 있습니다.</p><div><button type="button" data-practice="restart">튜토리얼 다시 하기</button><button type="button" data-practice="understood">이해했어요!</button></div>';document.body.append(end);
- window.addEventListener('practice-finished',()=>end.showModal());end.addEventListener('cancel',e=>e.preventDefault());end.addEventListener('click',e=>{const action=e.target.dataset.practice;if(action==='restart'){end.close();document.querySelector('[data-action=reset-test]').click();index=0;render();}if(action==='understood'){if(integrated)sessionStorage.setItem('hyu-study-practice-done','1');location.assign(actual);}});
+ function restart(){document.querySelector('[data-action=reset-test]').click();completed.clear();index=0;render();}
+ window.addEventListener('practice-finished',()=>end.showModal());end.addEventListener('cancel',e=>e.preventDefault());end.addEventListener('click',e=>{const action=e.target.dataset.practice;if(action==='restart'){end.close();restart();}if(action==='understood'){if(integrated)sessionStorage.setItem('hyu-study-practice-done','1');location.assign(actual);}});
+ render();restart();
 }

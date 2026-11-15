@@ -60,7 +60,7 @@ function overviewView(positions) {
   const width = Math.max(...points.map(p => p.x + CARD_W)) - left;
   const height = Math.max(...points.map(p => p.y + CARD_H)) - top;
   const headerHeight = integrated ? 49 : 0;
-  const availableHeight = Math.max(1, innerHeight - 84 - headerHeight - (practice ? 180 : 0));
+  const availableHeight = Math.max(1, innerHeight - 84 - headerHeight - (practice ? 280 : 0));
   const scale = clamp(Math.min((innerWidth - 32) / width, (availableHeight - 32) / height), 0.01, 1.5);
   return { scale, x: (innerWidth - width * scale) / 2 - left * scale, y: headerHeight + (availableHeight - height * scale) / 2 - top * scale };
 }
@@ -130,6 +130,7 @@ function armGroupHold() {
 }
 
 function save() { try { (practice ? sessionStorage : localStorage).setItem(storageKey, JSON.stringify(state)); } catch {} if(practice) window.dispatchEvent(new CustomEvent('practice-state',{detail:{review:state.review,views:state.descriptionViews}})); }
+function practiceAction(type) { if (practice) window.dispatchEvent(new CustomEvent('practice-action',{detail:type})); }
 function announce(text) { document.querySelector('#announcer').textContent = text; }
 function notify(text) { const el = document.querySelector('#toast'); clearTimeout(toastTimer); el.textContent = text; el.classList.add('visible'); toastTimer = setTimeout(() => el.classList.remove('visible'), 2600); announce(text); }
 function remember(snapshot) {
@@ -181,6 +182,7 @@ function commitCardMove(id, snap) {
     if (!stillInside) source.cardIds = source.cardIds.filter(member => member !== id);
   }
   refreshSingles();
+  if (source && source.cardIds.length < sourceSize) practiceAction('split');
   if (source?.cardIds.length && source.cardIds.length < sourceSize) arrangeRemainingGroup(source);
 }
 function invalidate() { state.confirmed = false; drawOutlines(); updateControls(); }
@@ -233,7 +235,7 @@ function openCardDetail(id) {
   document.querySelector('#close-card-detail').focus({ preventScroll: true });
   const now = new Date().toISOString(), previous = state.descriptionViews[id];
   state.descriptionViews[id] = { count: (previous?.count || 0) + 1, firstViewedAt: previous?.firstViewedAt || now, lastViewedAt: now, descriptionVersion: 'test-v1' };
-  save();
+  save(); practiceAction('description');
 }
 document.querySelector('#close-card-detail').addEventListener('click', () => closeCardDetail(true));
 document.querySelector('#start-single-group').addEventListener('click', () => {
@@ -253,7 +255,7 @@ document.querySelector('#single-group-form').addEventListener('submit', event =>
   const name = requestedName || `그룹 ${number}`;
   review.nextGroup = number + 1;
   review.groups.push({ id: crypto.randomUUID(), name, tone: [0, 1, 2, 3].find(tone => !review.groups.some(group => group.tone === tone)) ?? number % 4, cardIds: [detailCardId] });
-  refreshSingles(); closeCardDetail(); invalidate(); paint(); save(); announce('한 장짜리 그룹을 만들었다.');
+  refreshSingles(); closeCardDetail(); invalidate(); paint(); save(); announce('한 장짜리 그룹을 만들었다.'); practiceAction('singleton');
 });
 function selectedCardGroup() { return detailCardId && ensureGroups().groups.find(group => group.cardIds.includes(detailCardId)); }
 function cancelRename() {
@@ -274,7 +276,7 @@ document.querySelector('#rename-group-form').addEventListener('submit', event =>
   const name = document.querySelector('#rename-group-name').value.trim();
   if (name && name !== group.name) {
     remember(copy(state.positions)); group.name = name; invalidate(); paint(); save();
-    document.querySelector('#detail-group-name').textContent = name; announce('그룹 이름을 변경했습니다.');
+    document.querySelector('#detail-group-name').textContent = name; announce('그룹 이름을 변경했습니다.'); practiceAction('rename');
   }
   cancelRename();
 });
@@ -297,7 +299,7 @@ document.querySelector('#remove-from-group').addEventListener('click', () => {
   Object.assign(state.positions[id], target);
   refreshSingles(); if (group.cardIds.length) arrangeRemainingGroup(group);
   closeCardDetail(); invalidate(); animateArrangement([id]); paint(); save();
-  notify('카드를 그룹에서 뺐습니다.');
+  notify('카드를 그룹에서 뺐습니다.'); practiceAction('detach');
 });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !detailPanel.hidden) { event.preventDefault(); closeCardDetail(true); } });
 window.visualViewport?.addEventListener('resize', positionCardDetail);
@@ -711,7 +713,7 @@ function finishPointer(event, cancelled = false) {
   if (gesture?.type === 'pinch' && pointers.size === 1) {
     const start = pointers.values().next().value;
     gesture = { type: 'pan', start: { ...start }, view: { ...state.view } };
-    save(); return;
+    save(); practiceAction('zoom'); return;
   }
   if (!pointers.size) {
     stopAnimation();
@@ -724,6 +726,7 @@ function finishPointer(event, cancelled = false) {
         remember(gesture.snapshot);
         if (!wasGroup) commitCardMove(gesture.id, snap);
         if (snap || !wasGroup || !state.confirmed) invalidate();
+        practiceAction(wasGroup ? 'group_move' : snap ? 'merge' : 'card_move');
       }
       else if (gesture.type === 'card') {
         if (lastTap?.id === gesture.id && Date.now() - lastTap.time < 330) focusCard(gesture.id);
@@ -731,6 +734,7 @@ function finishPointer(event, cancelled = false) {
         lastTap = { id: gesture.id, time: Date.now() };
       }
     }
+    if (!cancelled && gesture?.type === 'pan' && Math.hypot(state.view.x-gesture.view.x,state.view.y-gesture.view.y)>3) practiceAction('pan');
     gesture = null; paint(); save();
     if (showDetail) openCardDetail(showDetail);
   }
@@ -749,7 +753,7 @@ viewport.addEventListener('wheel', event => {
   const delta = clamp(event.deltaY * unit, -240, 240);
   const sensitivity = event.ctrlKey || event.metaKey ? .008 : .002;
   zoomAt(event.clientX, event.clientY, state.view.scale * Math.exp(-delta * sensitivity));
-  save();
+  save(); practiceAction('zoom');
 }, { passive: false });
 viewport.addEventListener('keydown', event => {
   const id = event.target.closest('.card')?.dataset.id;
@@ -829,14 +833,14 @@ document.addEventListener('click', event => {
   const action = button.dataset.action;
   closeCardDetail();
   if (action === 'reset-test') resetTest();
-  else if (action === 'fit') fitAll();
+  else if (action === 'fit') { fitAll(); practiceAction('fit'); }
   else if (action === 'undo' && history.length) {
     future.push(historySnapshot());
-    restoreHistory(history.pop());
+    restoreHistory(history.pop()); practiceAction('undo');
   }
   else if (action === 'redo' && future.length) {
     history.push(historySnapshot());
-    restoreHistory(future.pop());
+    restoreHistory(future.pop()); practiceAction('redo');
   }
   else if (action === 'review') showReview();
   else if (action === 'back') { reviewDialog.close(); updateControls(); save(); }
