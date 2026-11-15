@@ -213,6 +213,7 @@ function closeCardDetail(restoreFocus = false) {
   if (!restoreFocus && detailPanel.contains(document.activeElement)) document.activeElement.blur();
   detailPanel.hidden = true; detailCardId = null;
   document.querySelector('#single-group-form').hidden = true;
+  document.querySelector('#rename-group-form').hidden = true;
   if (restoreFocus && previous) cardsElement.querySelector(`[data-id="${previous}"]`)?.focus({ preventScroll: true });
 }
 function openCardDetail(id) {
@@ -223,7 +224,11 @@ function openCardDetail(id) {
   document.querySelector('#detail-description').textContent = card.description;
   document.querySelector('#single-group-form').hidden = true;
   document.querySelector('#single-group-name').value = '';
-  document.querySelector('#start-single-group').hidden = ensureGroups().groups.some(group => group.cardIds.includes(id));
+  const group = ensureGroups().groups.find(group => group.cardIds.includes(id));
+  document.querySelector('#start-single-group').hidden = !!group;
+  document.querySelector('#group-card-actions').hidden = !group;
+  document.querySelector('#rename-group-form').hidden = true;
+  document.querySelector('#detail-group-name').textContent = group?.name || '';
   detailPanel.hidden = false; positionCardDetail();
   document.querySelector('#close-card-detail').focus({ preventScroll: true });
   const now = new Date().toISOString(), previous = state.descriptionViews[id];
@@ -249,6 +254,50 @@ document.querySelector('#single-group-form').addEventListener('submit', event =>
   review.nextGroup = number + 1;
   review.groups.push({ id: crypto.randomUUID(), name, tone: [0, 1, 2, 3].find(tone => !review.groups.some(group => group.tone === tone)) ?? number % 4, cardIds: [detailCardId] });
   refreshSingles(); closeCardDetail(); invalidate(); paint(); save(); announce('한 장짜리 그룹을 만들었다.');
+});
+function selectedCardGroup() { return detailCardId && ensureGroups().groups.find(group => group.cardIds.includes(detailCardId)); }
+function cancelRename() {
+  document.querySelector('#rename-group-form').hidden = true;
+  document.querySelector('#group-card-actions').hidden = !selectedCardGroup();
+  positionCardDetail();
+}
+document.querySelector('#start-rename-group').addEventListener('click', () => {
+  const group = selectedCardGroup(); if (!group) return;
+  document.querySelector('#rename-group-name').value = group.name;
+  document.querySelector('#group-card-actions').hidden = true;
+  document.querySelector('#rename-group-form').hidden = false;
+  positionCardDetail(); document.querySelector('#rename-group-name').focus({preventScroll:true}); document.querySelector('#rename-group-name').select();
+});
+document.querySelector('#cancel-rename-group').addEventListener('click', cancelRename);
+document.querySelector('#rename-group-form').addEventListener('submit', event => {
+  event.preventDefault(); const group = selectedCardGroup(); if (!group) return;
+  const name = document.querySelector('#rename-group-name').value.trim();
+  if (name && name !== group.name) {
+    remember(copy(state.positions)); group.name = name; invalidate(); paint(); save();
+    document.querySelector('#detail-group-name').textContent = name; announce('그룹 이름을 변경했습니다.');
+  }
+  cancelRename();
+});
+function detachedPosition(id) {
+  const current = state.positions[id], others = catalog.filter(card => card.id !== id).map(card => state.positions[card.id]);
+  const xs = new Set([current.x]), ys = new Set([current.y]);
+  for (const p of others) { xs.add(clamp(p.x-CARD_W-GROUP_CLEARANCE,-10000,10000)); xs.add(clamp(p.x+CARD_W+GROUP_CLEARANCE,-10000,10000)); ys.add(clamp(p.y-CARD_H-GROUP_CLEARANCE,-10000,10000)); ys.add(clamp(p.y+CARD_H+GROUP_CLEARANCE,-10000,10000)); }
+  const free = p => others.every(other => p.x+CARD_W+GROUP_CLEARANCE<=other.x+.001 || other.x+CARD_W+GROUP_CLEARANCE<=p.x+.001 || p.y+CARD_H+GROUP_CLEARANCE<=other.y+.001 || other.y+CARD_H+GROUP_CLEARANCE<=p.y+.001);
+  const candidates=[];for (const x of xs) for (const y of ys) candidates.push({x,y});
+  candidates.sort((a,b)=>(a.x-current.x)**2+(a.y-current.y)**2-(b.x-current.x)**2-(b.y-current.y)**2);
+  const visible = p => state.view.x+p.x*state.view.scale>=12 && state.view.x+(p.x+CARD_W)*state.view.scale<=innerWidth-12 && state.view.y+p.y*state.view.scale>=(integrated?61:12) && state.view.y+(p.y+CARD_H)*state.view.scale<=innerHeight-90;
+  return candidates.find(p => free(p) && visible(p)) || candidates.find(free);
+}
+document.querySelector('#remove-from-group').addEventListener('click', () => {
+  const group = selectedCardGroup(), id = detailCardId; if (!group) return;
+  const target = group.cardIds.length > 1 ? detachedPosition(id) : state.positions[id];
+  if (!target) { notify('카드를 놓을 빈 공간을 확보한 뒤 다시 시도해 주세요.'); return; }
+  remember(copy(state.positions));
+  group.cardIds = group.cardIds.filter(member => member !== id);
+  Object.assign(state.positions[id], target);
+  refreshSingles(); if (group.cardIds.length) arrangeRemainingGroup(group);
+  closeCardDetail(); invalidate(); animateArrangement([id]); paint(); save();
+  notify('카드를 그룹에서 뺐습니다.');
 });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !detailPanel.hidden) { event.preventDefault(); closeCardDetail(true); } });
 window.visualViewport?.addEventListener('resize', positionCardDetail);

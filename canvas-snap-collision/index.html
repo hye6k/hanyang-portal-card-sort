@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow">
   <title>자유 배치 카드 소팅 · 병합 자동 정렬 · 충돌</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=snap-collision-12">
+  <link rel="stylesheet" href="./style.css?v=card-actions-1">
   <link rel="stylesheet" href="../study/groups.css?v=group-design-1">
 </head>
 <body>
@@ -25,6 +25,14 @@
     <h2 id="detail-title"></h2>
     <p id="detail-description"></p>
     <button type="button" class="detail-create" id="start-single-group">이 카드로 그룹 만들기</button>
+    <div id="group-card-actions" hidden>
+      <p class="detail-membership">소속 그룹 <strong id="detail-group-name"></strong></p>
+      <div class="detail-group-buttons"><button type="button" id="start-rename-group">소속 그룹 이름 변경</button><button type="button" id="remove-from-group">이 카드를 그룹에서 빼기</button></div>
+    </div>
+    <form id="rename-group-form" hidden>
+      <label for="rename-group-name">소속 그룹 이름</label>
+      <div class="single-group-row"><input id="rename-group-name" type="text" maxlength="60" autocomplete="off"><button type="submit">저장</button><button type="button" id="cancel-rename-group">취소</button></div>
+    </form>
     <form id="single-group-form" hidden>
       <label for="single-group-name">그룹 이름</label>
       <div class="single-group-row"><input id="single-group-name" type="text" maxlength="60" autocomplete="off"><button type="submit">만들기</button></div>
@@ -34,7 +42,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <noscript>카드를 배치하려면 JavaScript를 사용할 수 있어야 한다.</noscript>
-  <script type="module" src="./app.js?v=group-design-1"></script>
+  <script type="module" src="./app.js?v=card-actions-1"></script>
   <script type="module" src="../study/tutorial.js?v=tutorial-4steps-1"></script>
 </body>
 </html>
