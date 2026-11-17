@@ -1,4 +1,4 @@
-import { integrated, urls } from '../study-50/flow.js?v=clean-routes-8';
+import { integrated, urls } from '../study-50/flow.js?v=experiment-intro-9';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
 
@@ -234,7 +234,7 @@ form.addEventListener('submit', async event => {
     state.answers = readFields();
     const errors = errorsFor(state.answers);
     if (errors.length) { showErrors(errors); return; }
-    if (integrated) { sessionStorage.setItem('hyu-study-50-pre', JSON.stringify(buildRecord(state.answers))); persist(); location.assign(form.dataset.destination || urls.cards); return; }
+    if (integrated) { sessionStorage.setItem('hyu-study-50-pre', JSON.stringify(buildRecord(state.answers))); persist(); location.assign(form.dataset.destination || urls.intro); return; }
     state.pending = buildRecord(state.answers); persist();
   }
   submitting = true; byId('submit-error').hidden = true; byId('validation-summary').hidden = true; syncUI();
@@ -257,5 +257,5 @@ window.addEventListener('pagehide', () => { if (!state.pending && !state.done) {
 byId('skip-pre-survey').addEventListener('click',()=>{
  if(submitting||state.pending)return;
  sessionStorage.setItem('hyu-study-50-pre',JSON.stringify({skipped:true,reason:'development_demo',skipped_at_client:new Date().toISOString()}));
- location.assign(urls.cards);
+ location.assign(urls.intro);
 });

@@ -1,5 +1,5 @@
-import { integrated, urls, cleanRoute, practiceRoute } from '../study-50/flow.js?v=clean-routes-8';
-import { cards as selectedCards } from './cards.js?v=clean-routes-8';
+import { integrated, urls, cleanRoute, practiceRoute } from '../study-50/flow.js?v=experiment-intro-9';
+import { cards as selectedCards } from './cards.js?v=experiment-intro-9';
 
 const practice = practiceRoute;
 const CARD_W = 144, CARD_H = 70, GAP = 24;

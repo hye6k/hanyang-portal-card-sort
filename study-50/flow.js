@@ -3,12 +3,12 @@ export const cleanRoute = location.pathname.startsWith(demoRoot);
 const routeStep = cleanRoute ? location.pathname.slice(demoRoot.length).split('/')[0] : '';
 export const practiceRoute = routeStep === 'tutorial' || new URLSearchParams(location.search).get('practice') === '1';
 export const integrated = cleanRoute || new URLSearchParams(location.search).get('flow') === 'study';
-export const urls = {pre:'../survey-50/?flow=study&step=pre&v=clean-routes-8',cards:'../canvas-50/?flow=study&step=cards&resume=post-survey&v=clean-routes-8', 'post-1':'../post-survey-50/?flow=study&step=post-1&stage=groups&v=clean-routes-8','post-3':'../post-survey-50/?flow=study&step=post-3&stage=questions&v=clean-routes-8','post-2':'../post-survey-50/?flow=study&step=post-2&stage=select&v=clean-routes-8'};
+export const urls = {intro:'../study-50/intro.html?flow=study&step=cards&v=experiment-intro-9',pre:'../survey-50/?flow=study&step=pre&v=experiment-intro-9',cards:'../canvas-50/?flow=study&step=cards&resume=post-survey&v=experiment-intro-9', 'post-1':'../post-survey-50/?flow=study&step=post-1&stage=groups&v=experiment-intro-9','post-3':'../post-survey-50/?flow=study&step=post-3&stage=questions&v=experiment-intro-9','post-2':'../post-survey-50/?flow=study&step=post-2&stage=select&v=experiment-intro-9'};
 let practiceDone=false;try{practiceDone=sessionStorage.getItem('hyu-study-50-practice-done-required-v1')==='1';}catch{}
 if(!practiceDone) urls.cards += '&practice=1';
-if(cleanRoute) Object.assign(urls, {pre:demoRoot+'pre/',cards:demoRoot+(practiceDone?'cards/':'tutorial/'),actual:demoRoot+'cards/',tutorial:demoRoot+'tutorial/','post-1':demoRoot+'post-1/','post-2':demoRoot+'post-2/','post-3':demoRoot+'post-3/'});
+if(cleanRoute) Object.assign(urls, {intro:demoRoot+'intro/',pre:demoRoot+'pre/',cards:demoRoot+(practiceDone?'cards/':'tutorial/'),actual:demoRoot+'cards/',tutorial:demoRoot+'tutorial/','post-1':demoRoot+'post-1/','post-2':demoRoot+'post-2/','post-3':demoRoot+'post-3/'});
 const steps=['pre','cards','post-1','post-2','post-3'], labels=['사전 설문','카드 분류','사후 질문 1','사후 질문 2','사후 질문 3'];
-let current=(cleanRoute ? (routeStep==='tutorial'?'cards':routeStep) : new URLSearchParams(location.search).get('step'))||'pre', frozen=false;
+let current=(cleanRoute ? (['tutorial','intro'].includes(routeStep)?'cards':routeStep) : new URLSearchParams(location.search).get('step'))||'pre', frozen=false;
 let reached=0;try{reached=Number(sessionStorage.getItem('hyu-study-50-reached'))||0;}catch{}
 let nav;
 function render(){if(!nav)return;reached=Math.max(reached,steps.indexOf(current));try{sessionStorage.setItem('hyu-study-50-reached',String(reached));}catch{}nav.innerHTML=steps.map((step,i)=>`<button type="button" data-study-step="${step}" ${step===current?'aria-current="step"':''} ${frozen||i>reached?'disabled':''}>${labels[i]}</button>`).join('<span aria-hidden="true">›</span>');}
