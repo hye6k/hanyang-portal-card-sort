@@ -1,4 +1,5 @@
-import { integrated, urls, updateFlow } from '../study/flow.js?v=journey-3';
+import { installDescriptions } from '../study/descriptions.js?v=usability-2';
+import { integrated, urls, updateFlow } from '../study-50/flow.js?v=selected-50-flow-1';
 import { cards as selectedCards } from '../canvas-50/cards.js';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
@@ -8,6 +9,7 @@ const STORAGE_KEY = `hyu-post-sort-survey:${VERSION}${integrated ? ':study' : ''
 const LEGACY_KEY = 'hyu-post-sort-survey:selected-50-unused-legacy';
 const SORT_KEY = 'hyu-spatial-card-sort-selected-50-v1';
 const cards = selectedCards;
+const descriptionButton = installDescriptions(cards);
 const byId = id => document.getElementById(id), form = byId('post-form');
 const copy = value => JSON.parse(JSON.stringify(value));
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -60,11 +62,11 @@ function renderSelection() {
   }
   const groups = state.sort.groups.map(group => ({ name: group.name, tone: group.tone, ids: group.card_ids }));
   if (state.sort.ungrouped_card_ids.length) groups.push({ ungrouped: true, name: '따로 둔 카드', ids: state.sort.ungrouped_card_ids });
-  byId('sort-selection').innerHTML = groups.map(group => `<section class="selection-group group-surface tone-${group.tone ?? 0}${group.ungrouped ? ' selection-ungrouped' : ''}"><div class="selection-columns group-heading"><h3>${esc(group.name)}</h3><span aria-hidden="true">분류가<br>애매함</span><span aria-hidden="true">명칭이<br>어려움</span></div><div class="selection-grid">${group.ids.map(id => `<article class="selection-card group-item" data-menu="${id}"><p>${esc(cardName(id))}</p><label class="selection-check"><input type="checkbox" data-card-kind="difficult" value="${id}" aria-label="${esc(cardName(id))}: 분류가 애매함"></label><label class="selection-check"><input type="checkbox" data-card-kind="naming" value="${id}" aria-label="${esc(cardName(id))}: 명칭이 어려움"></label></article>`).join('')}</div></section>`).join('');
+  byId('sort-selection').innerHTML = groups.map(group => `<section class="selection-group group-surface tone-${group.tone ?? 0}${group.ungrouped ? ' selection-ungrouped' : ''}"><div class="selection-columns group-heading"><h3>${esc(group.name)}</h3><span aria-hidden="true">분류가<br>애매함</span><span aria-hidden="true">명칭이<br>어려움</span></div><div class="selection-grid">${group.ids.map(id => `<article class="selection-card group-item" data-menu="${id}"><div class="menu-with-description"><span>${esc(cardName(id))}</span>${descriptionButton(id)}</div><label class="selection-check"><input type="checkbox" data-card-kind="difficult" value="${id}" aria-label="${esc(cardName(id))}: 분류가 애매함"></label><label class="selection-check"><input type="checkbox" data-card-kind="naming" value="${id}" aria-label="${esc(cardName(id))}: 명칭이 어려움"></label></article>`).join('')}</div></section>`).join('');
 }
 function renderGroupReasons() {
   const groups = state.sort?.groups || [];
-  byId('group-reasons').innerHTML = groups.length ? groups.map((group, i) => `<section class="group-response group-surface tone-${group.tone ?? i % 4}" data-question="group-${i}"><div class="group-heading"><h3>${esc(group.name)}</h3></div><ul class="group-response-cards" aria-label="그룹에 속한 기능">${group.card_ids.map(id => `<li class="group-item">${esc(cardName(id))}</li>`).join('')}</ul><div class="group-response-form"><label for="group-reason-${i}">분류한 이유</label><textarea id="group-reason-${i}" data-group-reason="${esc(group.id)}" rows="2" maxlength="800" aria-describedby="group-${i}-error">${esc(state.answers.group_reasons[group.id] || '')}</textarea><p class="field-error" id="group-${i}-error" hidden></p></div></section>`).join('') : '<p class="source-empty">만든 그룹이 없습니다. 다음으로 넘어가거나 카드 분류로 돌아가 그룹을 만들 수 있습니다.</p>';
+  byId('group-reasons').innerHTML = groups.length ? groups.map((group, i) => `<section class="group-response group-surface tone-${group.tone ?? i % 4}" data-question="group-${i}"><div class="group-heading"><h3>${esc(group.name)}</h3></div><ul class="group-response-cards" aria-label="그룹에 속한 기능">${group.card_ids.map(id => `<li class="group-item menu-with-description"><span>${esc(cardName(id))}</span>${descriptionButton(id)}</li>`).join('')}</ul><div class="group-response-form"><label for="group-reason-${i}">분류한 이유</label><textarea id="group-reason-${i}" data-group-reason="${esc(group.id)}" rows="2" maxlength="800" aria-describedby="group-${i}-error">${esc(state.answers.group_reasons[group.id] || '')}</textarea><p class="field-error" id="group-${i}-error" hidden></p></div></section>`).join('') : '<p class="source-empty">만든 그룹이 없습니다. 다음으로 넘어가거나 카드 분류로 돌아가 그룹을 만들 수 있습니다.</p>';
 }
 function groupErrors() { return (state.sort?.groups || []).flatMap((group, i) => state.answers.group_reasons[group.id]?.trim() ? [] : [[`group-${i}`, '이 그룹으로 분류한 이유를 간단히 적어 주세요.']]); }
 byId('clarity-options').innerHTML = clarityLabels.map((label, i) => `<label class="scale-option"><input type="radio" name="clarity" value="${i + 1}"><span class="scale-number">${i + 1}</span><span class="scale-label">${esc(label)}</span></label>`).join('');
@@ -78,7 +80,7 @@ function syncReasonBlocks() {
   list.querySelectorAll('[data-followup-menu]').forEach(el => { if (!selected.includes(el.dataset.followupMenu)) el.remove(); });
   selected.forEach((id, i) => {
     let article = list.querySelector(`[data-followup-menu="${id}"]`);
-    if (!article) { list.insertAdjacentHTML('beforeend', `<article class="menu-followup" data-followup-menu="${id}"><div class="menu-followup-heading"><h3>${esc(cardName(id))}</h3><span data-current-group></span></div><div data-menu-questions></div></article>`); article = list.querySelector(`[data-followup-menu="${id}"]`); }
+    if (!article) { list.insertAdjacentHTML('beforeend', `<article class="menu-followup" data-followup-menu="${id}"><div class="menu-followup-heading"><div class="menu-with-description"><h3>${esc(cardName(id))}</h3>${descriptionButton(id)}</div><span data-current-group></span></div><div data-menu-questions></div></article>`); article = list.querySelector(`[data-followup-menu="${id}"]`); }
     const next = list.children[i]; if (next !== article) list.insertBefore(article, next || null);
     article.querySelector('[data-current-group]').textContent = groupNameFor(id);
     const questions = article.querySelector('[data-menu-questions]');
@@ -172,12 +174,12 @@ form.addEventListener('input', event => {
 });
 function buildRecord() {
   const a = state.answers, answersFor = kind => a[kind].map(id => ({ card_id: id, reasons: [...a[`${kind}_reasons`][id].selected], other: a[`${kind}_reasons`][id].selected.includes('other') ? a[`${kind}_reasons`][id].other.trim() : null }));
-  return { id: state.id, study_version: VERSION, is_test: true, payload: { schema_version: 4, kind: 'portal_post_sort_survey', study_mode: 'pilot', workflow: integrated ? 'pre-sort-post-v1' : 'sort-select-questions-v1', ...(integrated ? { pre_survey: JSON.parse(sessionStorage.getItem('hyu-study-pre') || 'null') } : {}), consent: a.consent, cards: copy(cards), sort_result: copy(state.sort), answers: { group_reasons: state.sort.groups.map(group => ({group_id: group.id, group_name: group.name, card_ids: [...group.card_ids], reason: (a.group_reasons[group.id] || '').trim()})), difficult_none: a.difficult_none, difficult_cards: answersFor('difficult'), label_comprehension: a.clarity, naming_none: a.naming_none, naming_difficult_cards: answersFor('naming'), grouping_criteria: [...a.criterion], grouping_criterion_other: a.criterion.includes('other') ? a.criterion_other.trim() : null }, questionnaire: { sorting_reasons: Object.fromEntries(reasons.difficult), naming_reasons: Object.fromEntries(reasons.naming), label_comprehension_scale: Object.fromEntries(clarityLabels.map((label, i) => [i + 1, label])), grouping_criteria: Object.fromEntries(criteria) }, started_at: state.startedAt, submitted_at_client: new Date().toISOString() } };
+  return { id: state.id, study_version: VERSION, is_test: true, payload: { schema_version: 4, kind: 'portal_post_sort_survey', study_mode: 'pilot', workflow: integrated ? 'pre-sort-post-v1' : 'sort-select-questions-v1', ...(integrated ? { pre_survey: JSON.parse(sessionStorage.getItem('hyu-study-50-pre') || 'null') } : {}), consent: a.consent, cards: copy(cards), sort_result: copy(state.sort), answers: { group_reasons: state.sort.groups.map(group => ({group_id: group.id, group_name: group.name, card_ids: [...group.card_ids], reason: (a.group_reasons[group.id] || '').trim()})), difficult_none: a.difficult_none, difficult_cards: answersFor('difficult'), label_comprehension: a.clarity, naming_none: a.naming_none, naming_difficult_cards: answersFor('naming'), grouping_criteria: [...a.criterion], grouping_criterion_other: a.criterion.includes('other') ? a.criterion_other.trim() : null }, questionnaire: { sorting_reasons: Object.fromEntries(reasons.difficult), naming_reasons: Object.fromEntries(reasons.naming), label_comprehension_scale: Object.fromEntries(clarityLabels.map((label, i) => [i + 1, label])), grouping_criteria: Object.fromEntries(criteria) }, started_at: state.startedAt, submitted_at_client: new Date().toISOString() } };
 }
 form.addEventListener('submit', async event => {
   event.preventDefault(); if (submitting || state.done) return;
   if (!state.pending) {
-    if (integrated && !sessionStorage.getItem('hyu-study-pre')) { location.assign(urls.pre); return; }
+    if (integrated && !sessionStorage.getItem('hyu-study-50-pre')) { location.assign(urls.pre); return; }
     state.answers = readAnswers();
     if (state.stage !== 'questions' || !state.sort) { showStage('select'); return; }
     state.sort = readSort(); if (!state.sort) { renderSelection(); showStage('select'); return; }

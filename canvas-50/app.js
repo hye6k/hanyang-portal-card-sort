@@ -1,4 +1,4 @@
-import { integrated, urls } from '../study/flow.js?v=journey-3';
+import { integrated, urls } from '../study-50/flow.js?v=selected-50-flow-1';
 import { cards as selectedCards } from './cards.js';
 
 const practice = new URLSearchParams(location.search).get('practice') === '1';
@@ -583,8 +583,11 @@ function pushOffset(ids, blockers) {
 }
 function pushNeighbours() {
   const activeIds = gesture.type === 'group' ? gesture.ids : [gesture.id];
-  const placed = [{ cardIds: activeIds, active: true }];
-  const remaining = [...gesture.others];
+  const source = gesture.type === 'card' ? ensureGroups().groups.find(group => group.cardIds.includes(gesture.id)) : null;
+  const sourceRemainder = source && gesture.others.find(group => group.id === source.id);
+  // The source stays in place while an individual card passes out through it.
+  const placed = [{ cardIds: activeIds, active: true }, ...(sourceRemainder ? [sourceRemainder] : [])];
+  const remaining = gesture.others.filter(group => !sourceRemainder || group.id !== sourceRemainder.id);
   // Each encountered group becomes a fixed obstacle for the next one. The held
   // object follows the pointer; contact propagates outward without bouncing back.
   while (remaining.length) {
@@ -776,7 +779,7 @@ function reviewRows(ids) {
 }
 function renderReview() {
   const result = state.review;
-  reviewDialog.innerHTML = `<div class="review-heading"><h1>그룹 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group group-surface tone-${group.tone ?? index % 4}"><div class="review-group-heading group-heading"><label><span class="sr-only">그룹 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="그룹 이름" maxlength="60" aria-label="${index + 1}번째 그룹 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">완료</button></div>`;
+  reviewDialog.innerHTML = `<div class="review-heading"><h1>그룹 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><p class="review-name-help">각 그룹에 어울리는 이름을 작성해 주세요. 그룹 이름을 누르면 수정할 수 있습니다.</p><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group group-surface tone-${group.tone ?? index % 4}"><div class="review-group-heading group-heading"><label><span class="sr-only">그룹 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="그룹 이름" maxlength="60" aria-label="${index + 1}번째 그룹 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">완료</button></div>`;
 }
 function showReview() {
   ensureGroups();

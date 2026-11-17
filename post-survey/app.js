@@ -1,5 +1,7 @@
+import { installDescriptions } from '../study/descriptions.js?v=usability-2';
 import { integrated, urls, updateFlow } from '../study/flow.js?v=journey-3';
 import { cardNames } from '../test/cards.js';
+import { testDescriptions } from '../test/descriptions.js';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
 
@@ -7,7 +9,8 @@ const VERSION = 'portal-post-sort-survey-2026-11-14-v2';
 const STORAGE_KEY = `hyu-post-sort-survey:${VERSION}${integrated ? ':study' : ''}`;
 const LEGACY_KEY = 'hyu-post-sort-survey:portal-post-sort-survey-2026-11-14-v1';
 const SORT_KEY = 'hyu-spatial-card-sort-snap-collision-v1';
-const cards = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name }));
+const cards = cardNames.map((name, i) => ({ id: `card-${i + 1}`, name, description: testDescriptions[i] }));
+const descriptionButton = installDescriptions(cards);
 const byId = id => document.getElementById(id), form = byId('post-form');
 const copy = value => JSON.parse(JSON.stringify(value));
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -60,11 +63,11 @@ function renderSelection() {
   }
   const groups = state.sort.groups.map(group => ({ name: group.name, tone: group.tone, ids: group.card_ids }));
   if (state.sort.ungrouped_card_ids.length) groups.push({ ungrouped: true, name: '따로 둔 카드', ids: state.sort.ungrouped_card_ids });
-  byId('sort-selection').innerHTML = groups.map(group => `<section class="selection-group group-surface tone-${group.tone ?? 0}${group.ungrouped ? ' selection-ungrouped' : ''}"><div class="selection-columns group-heading"><h3>${esc(group.name)}</h3><span aria-hidden="true">분류가<br>애매함</span><span aria-hidden="true">명칭이<br>어려움</span></div><div class="selection-grid">${group.ids.map(id => `<article class="selection-card group-item" data-menu="${id}"><p>${esc(cardName(id))}</p><label class="selection-check"><input type="checkbox" data-card-kind="difficult" value="${id}" aria-label="${esc(cardName(id))}: 분류가 애매함"></label><label class="selection-check"><input type="checkbox" data-card-kind="naming" value="${id}" aria-label="${esc(cardName(id))}: 명칭이 어려움"></label></article>`).join('')}</div></section>`).join('');
+  byId('sort-selection').innerHTML = groups.map(group => `<section class="selection-group group-surface tone-${group.tone ?? 0}${group.ungrouped ? ' selection-ungrouped' : ''}"><div class="selection-columns group-heading"><h3>${esc(group.name)}</h3><span aria-hidden="true">분류가<br>애매함</span><span aria-hidden="true">명칭이<br>어려움</span></div><div class="selection-grid">${group.ids.map(id => `<article class="selection-card group-item" data-menu="${id}"><div class="menu-with-description"><span>${esc(cardName(id))}</span>${descriptionButton(id)}</div><label class="selection-check"><input type="checkbox" data-card-kind="difficult" value="${id}" aria-label="${esc(cardName(id))}: 분류가 애매함"></label><label class="selection-check"><input type="checkbox" data-card-kind="naming" value="${id}" aria-label="${esc(cardName(id))}: 명칭이 어려움"></label></article>`).join('')}</div></section>`).join('');
 }
 function renderGroupReasons() {
   const groups = state.sort?.groups || [];
-  byId('group-reasons').innerHTML = groups.length ? groups.map((group, i) => `<section class="group-response group-surface tone-${group.tone ?? i % 4}" data-question="group-${i}"><div class="group-heading"><h3>${esc(group.name)}</h3></div><ul class="group-response-cards" aria-label="그룹에 속한 기능">${group.card_ids.map(id => `<li class="group-item">${esc(cardName(id))}</li>`).join('')}</ul><div class="group-response-form"><label for="group-reason-${i}">분류한 이유</label><textarea id="group-reason-${i}" data-group-reason="${esc(group.id)}" rows="2" maxlength="800" aria-describedby="group-${i}-error">${esc(state.answers.group_reasons[group.id] || '')}</textarea><p class="field-error" id="group-${i}-error" hidden></p></div></section>`).join('') : '<p class="source-empty">만든 그룹이 없습니다. 다음으로 넘어가거나 카드 분류로 돌아가 그룹을 만들 수 있습니다.</p>';
+  byId('group-reasons').innerHTML = groups.length ? groups.map((group, i) => `<section class="group-response group-surface tone-${group.tone ?? i % 4}" data-question="group-${i}"><div class="group-heading"><h3>${esc(group.name)}</h3></div><ul class="group-response-cards" aria-label="그룹에 속한 기능">${group.card_ids.map(id => `<li class="group-item menu-with-description"><span>${esc(cardName(id))}</span>${descriptionButton(id)}</li>`).join('')}</ul><div class="group-response-form"><label for="group-reason-${i}">분류한 이유</label><textarea id="group-reason-${i}" data-group-reason="${esc(group.id)}" rows="2" maxlength="800" aria-describedby="group-${i}-error">${esc(state.answers.group_reasons[group.id] || '')}</textarea><p class="field-error" id="group-${i}-error" hidden></p></div></section>`).join('') : '<p class="source-empty">만든 그룹이 없습니다. 다음으로 넘어가거나 카드 분류로 돌아가 그룹을 만들 수 있습니다.</p>';
 }
 function groupErrors() { return (state.sort?.groups || []).flatMap((group, i) => state.answers.group_reasons[group.id]?.trim() ? [] : [[`group-${i}`, '이 그룹으로 분류한 이유를 간단히 적어 주세요.']]); }
 byId('clarity-options').innerHTML = clarityLabels.map((label, i) => `<label class="scale-option"><input type="radio" name="clarity" value="${i + 1}"><span class="scale-number">${i + 1}</span><span class="scale-label">${esc(label)}</span></label>`).join('');
@@ -78,7 +81,7 @@ function syncReasonBlocks() {
   list.querySelectorAll('[data-followup-menu]').forEach(el => { if (!selected.includes(el.dataset.followupMenu)) el.remove(); });
   selected.forEach((id, i) => {
     let article = list.querySelector(`[data-followup-menu="${id}"]`);
-    if (!article) { list.insertAdjacentHTML('beforeend', `<article class="menu-followup" data-followup-menu="${id}"><div class="menu-followup-heading"><h3>${esc(cardName(id))}</h3><span data-current-group></span></div><div data-menu-questions></div></article>`); article = list.querySelector(`[data-followup-menu="${id}"]`); }
+    if (!article) { list.insertAdjacentHTML('beforeend', `<article class="menu-followup" data-followup-menu="${id}"><div class="menu-followup-heading"><div class="menu-with-description"><h3>${esc(cardName(id))}</h3>${descriptionButton(id)}</div><span data-current-group></span></div><div data-menu-questions></div></article>`); article = list.querySelector(`[data-followup-menu="${id}"]`); }
     const next = list.children[i]; if (next !== article) list.insertBefore(article, next || null);
     article.querySelector('[data-current-group]').textContent = groupNameFor(id);
     const questions = article.querySelector('[data-menu-questions]');

@@ -1,8 +1,8 @@
 import {integrated} from './flow.js?v=journey-3';
 const practice=new URLSearchParams(location.search).get('practice')==='1';
-const actual=new URL(location.href);actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','tutorial-expanded-1');
+const actual=new URL(location.href);actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','usability-2');
 const training=new URL(actual);training.searchParams.set('practice','1');
-const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=tutorial-expanded-1';document.head.append(css);
+const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=usability-2';document.head.append(css);
 if(!practice){
  const help=document.createElement('button');help.className='practice-help';help.textContent='사용 방법';help.addEventListener('click',()=>location.assign(training));document.body.append(help);
 }else{
@@ -17,7 +17,14 @@ if(!practice){
  let index=0;const completed=new Set();
  const details=document.querySelector('#card-detail');
  function updateChecks(){panel.querySelectorAll('[data-practice-task]').forEach(el=>{const task=steps[index].tasks[Number(el.dataset.practiceTask)];const done=task[0].every(action=>completed.has(action));el.classList.toggle('is-done',done);el.querySelector('[data-task-mark]').textContent=done?'✓':'○';el.querySelector('[data-task-mark]').setAttribute('aria-label',done?'완료':'미완료');});}
- function updateDetail(){document.body.classList.toggle('practice-detail-open',!details.hidden);}
+ function updateDetail(){
+ const top=integrated?61:12;
+ document.body.style.setProperty('--practice-detail-top',`${top}px`);
+ document.body.style.setProperty('--practice-detail-height',`${Math.max(70,panel.getBoundingClientRect().top-top-12)}px`);
+ document.body.classList.toggle('practice-detail-open',!details.hidden);
+ }
+ new ResizeObserver(updateDetail).observe(panel);
+ window.addEventListener('resize',updateDetail);
  function render(){panel.innerHTML=`<div class="practice-guide-heading"><span>조작 연습 ${index+1} / ${steps.length}</span></div><h2>${steps[index].title}</h2><p>${steps[index].text}</p><ul class="practice-tasks">${steps[index].tasks.map((task,i)=>`<li data-practice-task="${i}"><span data-task-mark></span><span>${task[1]}</span></li>`).join('')}</ul><p class="practice-tip">${steps[index].tip}</p><div class="practice-guide-actions"><button type="button" data-practice="back" ${index===0?'disabled':''}>이전</button><button type="button" data-practice="next">${index===steps.length-1?'그룹 확인하기':'다음'}</button></div>`;
  document.querySelectorAll('.practice-target').forEach(el=>el.classList.remove('practice-target'));for(const action of steps[index].focus)document.querySelector(`[data-action="${action}"]`)?.classList.add('practice-target');if(index===1)document.querySelector('[data-id="card-3"]')?.classList.add('practice-target');updateChecks();updateDetail();if(index>0)document.querySelector('[data-action=fit]').click();}
  panel.addEventListener('click',e=>{const action=e.target.dataset.practice;if(!action)return;document.querySelector('#close-card-detail').click();if(action==='back'&&index>0){index--;render();}if(action==='next'){if(index<steps.length-1){index++;render();}else document.querySelector('[data-action=review]').click();}});

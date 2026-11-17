@@ -1,5 +1,6 @@
 import { integrated, urls } from '../study/flow.js?v=journey-3';
 import { cardNames } from '../test/cards.js';
+import { testDescriptions } from '../test/descriptions.js';
 
 const practice = new URLSearchParams(location.search).get('practice') === '1';
 const CARD_W = 144, CARD_H = 70, GAP = 24;
@@ -7,38 +8,7 @@ const CARD_CLEARANCE = 8, COLLISION_RADIUS = 16;
 const GROUP_PADDING = 20, GROUP_RADIUS = 18, GROUP_OUTLINE_GAP = 12;
 const GROUP_CLEARANCE = GROUP_PADDING * 2 + GROUP_OUTLINE_GAP;
 // Interaction-test copy only; these descriptions are not verified portal documentation.
-const testDescriptions = [
-  '이번 학기에 수강한 과목의 성적을 확인하는 화면입니다.',
-  '학기별로 나누어 이전 성적 기록을 살펴볼 수 있습니다.',
-  '졸업에 필요한 조건을 얼마나 충족했는지 확인하는 기능입니다.',
-  '필수 과목을 이수했는지 확인하는 화면입니다.',
-  '원하는 교과목의 정보를 찾아보는 기능입니다.',
-  '전공에서 어떤 과목을 배우는지 교육과정을 살펴볼 수 있습니다.',
-  '교과목과 관련된 자료와 정보를 모아 확인하는 화면입니다.',
-  '신청한 수업 목록과 신청 내역을 확인하는 기능입니다.',
-  '수업별 출석 기록을 확인하는 화면입니다.',
-  '강의에 대한 평가 결과를 찾아보는 기능입니다.',
-  '계절학기에 듣고 싶은 수업의 수요를 제출하는 기능입니다.',
-  '일정 기간 학업을 쉬기 위한 신청을 진행합니다.',
-  '소속 학과를 변경하기 위한 신청을 진행합니다.',
-  '전공을 신청하거나 신청한 전공을 포기하는 기능입니다.',
-  '납부할 등록금이 적힌 고지서를 출력하는 기능입니다.',
-  '납부한 금액과 납부 내역을 확인하는 화면입니다.',
-  '등록금을 여러 차례 나누어 납부하도록 신청하는 기능입니다.',
-  '지금까지 받은 장학금 내역을 살펴볼 수 있습니다.',
-  '교내 장학금에 지원하기 위한 신청 화면입니다.',
-  '포털에서 제공하는 증명서를 발급받는 기능입니다.',
-  '포털 로그인에 사용하는 비밀번호를 변경합니다.',
-  '등록된 개인 정보를 확인하고 수정하는 화면입니다.',
-  '포털 이용 환경과 로그인 관련 설정을 변경하는 기능입니다.',
-  '포털에서 사용하는 아이디를 변경하는 기능입니다.',
-  '로그인 인증에 사용할 일회용 인증 수단을 설정하는 기능입니다.',
-  '학교 메일을 신청하거나 메일 서비스로 이동하는 기능입니다.',
-  '정규 수업 외의 프로그램에 참여를 신청하는 기능입니다.',
-  '참여한 비교과 프로그램과 활동 내역을 살펴볼 수 있습니다.',
-  '고민이나 학습에 관해 상담받기 위해 신청하는 기능입니다.',
-  '현장실습 기관을 찾아보고 실습 참여를 신청하는 기능입니다.',
-];
+
 const practiceNames = ['사과', '바나나', '연필', '지우개'];
 const catalog = (practice ? practiceNames : cardNames).map((name, i) => ({ id: `card-${i + 1}`, name, description: practice ? ['아삭한 식감의 과일입니다.', '껍질을 벗겨 먹는 과일입니다.', '글씨를 쓰거나 그림을 그리는 도구입니다.', '연필로 쓴 내용을 지우는 도구입니다.'][i] : testDescriptions[i] }));
 const viewport = document.querySelector('#viewport');
@@ -616,8 +586,11 @@ function pushOffset(ids, blockers) {
 }
 function pushNeighbours() {
   const activeIds = gesture.type === 'group' ? gesture.ids : [gesture.id];
-  const placed = [{ cardIds: activeIds, active: true }];
-  const remaining = [...gesture.others];
+  const source = gesture.type === 'card' ? ensureGroups().groups.find(group => group.cardIds.includes(gesture.id)) : null;
+  const sourceRemainder = source && gesture.others.find(group => group.id === source.id);
+  // The source stays in place while an individual card passes out through it.
+  const placed = [{ cardIds: activeIds, active: true }, ...(sourceRemainder ? [sourceRemainder] : [])];
+  const remaining = gesture.others.filter(group => !sourceRemainder || group.id !== sourceRemainder.id);
   // Each encountered group becomes a fixed obstacle for the next one. The held
   // object follows the pointer; contact propagates outward without bouncing back.
   while (remaining.length) {
@@ -809,7 +782,7 @@ function reviewRows(ids) {
 }
 function renderReview() {
   const result = state.review;
-  reviewDialog.innerHTML = `<div class="review-heading"><h1>그룹 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group group-surface tone-${group.tone ?? index % 4}"><div class="review-group-heading group-heading"><label><span class="sr-only">그룹 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="그룹 이름" maxlength="60" aria-label="${index + 1}번째 그룹 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">완료</button></div>`;
+  reviewDialog.innerHTML = `<div class="review-heading"><h1>그룹 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><p class="review-name-help">각 그룹에 어울리는 이름을 작성해 주세요. 그룹 이름을 누르면 수정할 수 있습니다.</p><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group group-surface tone-${group.tone ?? index % 4}"><div class="review-group-heading group-heading"><label><span class="sr-only">그룹 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="그룹 이름" maxlength="60" aria-label="${index + 1}번째 그룹 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">완료</button></div>`;
 }
 function showReview() {
   ensureGroups();
