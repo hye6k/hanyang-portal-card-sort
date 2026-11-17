@@ -1,5 +1,5 @@
-import { integrated, urls } from '../study-50/flow.js?v=required-practice-6';
-import { cards as selectedCards } from './cards.js';
+import { integrated, urls } from '../study-50/flow.js?v=descriptions-7';
+import { cards as selectedCards } from './cards.js?v=descriptions-7';
 
 const practice = new URLSearchParams(location.search).get('practice') === '1';
 const CARD_W = 144, CARD_H = 70, GAP = 24;
@@ -204,7 +204,7 @@ function openCardDetail(id) {
   detailPanel.hidden = false; positionCardDetail();
   document.querySelector('#close-card-detail').focus({ preventScroll: true });
   const now = new Date().toISOString(), previous = state.descriptionViews[id];
-  state.descriptionViews[id] = { count: (previous?.count || 0) + 1, firstViewedAt: previous?.firstViewedAt || now, lastViewedAt: now, descriptionVersion: 'test-v1' };
+  state.descriptionViews[id] = { count: (previous?.count || 0) + 1, firstViewedAt: previous?.firstViewedAt || now, lastViewedAt: now, descriptionVersion: practice ? 'practice-v1' : 'portal-selected-50-descriptions-v2' };
   save(); practiceAction('description');
 }
 document.querySelector('#close-card-detail').addEventListener('click', () => closeCardDetail(true));
