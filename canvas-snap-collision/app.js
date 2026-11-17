@@ -172,13 +172,17 @@ function positionCardDetail() {
     detailPanel.style.maxHeight = `${Math.max(140, Math.min(420, (visual?.height || innerHeight) - 100))}px`;
     return;
   }
-  detailPanel.style.bottom = 'auto'; detailPanel.style.maxHeight = 'calc(100dvh - 100px)';
+  const topLimit = integrated ? 61 : 12;
+  const guide = practice ? document.querySelector('.practice-guide') : null;
+  const bottomLimit = guide ? guide.getBoundingClientRect().top - 12 : innerHeight - 78;
+  detailPanel.style.bottom = 'auto';
+  detailPanel.style.maxHeight = `${Math.max(70, bottomLimit - topLimit)}px`;
   const rect = cardsElement.querySelector(`[data-id="${detailCardId}"]`).getBoundingClientRect();
   const width = detailPanel.offsetWidth, height = detailPanel.offsetHeight;
   let left = rect.right + 12;
   if (left + width > innerWidth - 12) left = rect.left - width - 12;
   detailPanel.style.left = `${clamp(left, 12, Math.max(12, innerWidth - width - 12))}px`;
-  detailPanel.style.top = `${clamp(rect.top, 12, Math.max(12, innerHeight - height - 78))}px`;
+  detailPanel.style.top = `${clamp(rect.top, topLimit, Math.max(topLimit, bottomLimit - height))}px`;
 }
 function closeCardDetail(restoreFocus = false) {
   const previous = detailCardId;

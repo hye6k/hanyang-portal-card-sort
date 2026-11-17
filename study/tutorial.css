@@ -3,4 +3,4 @@
 
 /* Instructions stay anchored; card details use the separate space above. */
 .practice-guide{bottom:calc(82px + env(safe-area-inset-bottom));max-height:min(330px,calc(55dvh - 60px))}
-.practice-detail-open #card-detail{top:var(--practice-detail-top,12px)!important;bottom:auto!important;left:12px!important;width:min(440px,calc(100% - 24px));max-height:var(--practice-detail-height,200px)!important}
+@media(max-width:700px){.practice-detail-open #card-detail{top:var(--practice-detail-top,12px)!important;bottom:auto!important;left:12px!important;width:min(440px,calc(100% - 24px));max-height:var(--practice-detail-height,200px)!important}}
