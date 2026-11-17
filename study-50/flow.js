@@ -1,5 +1,5 @@
 export const integrated = new URLSearchParams(location.search).get('flow') === 'study';
-export const urls = {pre:'../survey-50/?flow=study&step=pre&v=tutorial-bottom-4',cards:'../canvas-50/?flow=study&step=cards&resume=post-survey&v=tutorial-bottom-4', 'post-1':'../post-survey-50/?flow=study&step=post-1&stage=groups&v=tutorial-bottom-4','post-3':'../post-survey-50/?flow=study&step=post-3&stage=questions&v=tutorial-bottom-4','post-2':'../post-survey-50/?flow=study&step=post-2&stage=select&v=tutorial-bottom-4'};
+export const urls = {pre:'../survey-50/?flow=study&step=pre&v=tutorial-card-side-5',cards:'../canvas-50/?flow=study&step=cards&resume=post-survey&v=tutorial-card-side-5', 'post-1':'../post-survey-50/?flow=study&step=post-1&stage=groups&v=tutorial-card-side-5','post-3':'../post-survey-50/?flow=study&step=post-3&stage=questions&v=tutorial-card-side-5','post-2':'../post-survey-50/?flow=study&step=post-2&stage=select&v=tutorial-card-side-5'};
 let practiceDone=false;try{practiceDone=sessionStorage.getItem('hyu-study-50-practice-done')==='1';}catch{}
 if(!practiceDone) urls.cards += '&practice=1';
 const steps=['pre','cards','post-1','post-2','post-3'], labels=['사전 설문','카드 분류','사후 질문 1','사후 질문 2','사후 질문 3'];
