@@ -1,8 +1,8 @@
-import {integrated} from '../study-50/flow.js?v=selected-50-flow-1';
+import {integrated} from '../study-50/flow.js?v=tutorial-bottom-4';
 const practice=new URLSearchParams(location.search).get('practice')==='1';
-const actual=new URL(location.href);actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','tutorial-anchor-3');
+const actual=new URL(location.href);actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','tutorial-bottom-4');
 const training=new URL(actual);training.searchParams.set('practice','1');
-const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=tutorial-anchor-3';document.head.append(css);
+const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=tutorial-bottom-4';document.head.append(css);
 if(!practice){
  const help=document.createElement('button');help.className='practice-help';help.textContent='사용 방법';help.addEventListener('click',()=>location.assign(training));document.body.append(help);
 }else{

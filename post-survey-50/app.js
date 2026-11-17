@@ -1,5 +1,5 @@
 import { installDescriptions } from '../study/descriptions.js?v=usability-2';
-import { integrated, urls, updateFlow } from '../study-50/flow.js?v=selected-50-flow-1';
+import { integrated, urls, updateFlow } from '../study-50/flow.js?v=tutorial-bottom-4';
 import { cards as selectedCards } from '../canvas-50/cards.js';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';

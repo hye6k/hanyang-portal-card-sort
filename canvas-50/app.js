@@ -1,4 +1,4 @@
-import { integrated, urls } from '../study-50/flow.js?v=selected-50-flow-1';
+import { integrated, urls } from '../study-50/flow.js?v=tutorial-bottom-4';
 import { cards as selectedCards } from './cards.js';
 
 const practice = new URLSearchParams(location.search).get('practice') === '1';
@@ -174,6 +174,12 @@ function positionCardDetail() {
   const bottomLimit = guide ? guide.getBoundingClientRect().top - 12 : innerHeight - 78;
   detailPanel.style.bottom = 'auto';
   detailPanel.style.maxHeight = `${Math.max(70, bottomLimit - topLimit)}px`;
+  if (guide) {
+    detailPanel.style.top = 'auto';
+    detailPanel.style.bottom = `${innerHeight - bottomLimit}px`;
+    detailPanel.style.left = `${(innerWidth - detailPanel.offsetWidth) / 2}px`;
+    return;
+  }
   const rect = cardsElement.querySelector(`[data-id="${detailCardId}"]`).getBoundingClientRect();
   const width = detailPanel.offsetWidth, height = detailPanel.offsetHeight;
   let left = rect.right + 12;
