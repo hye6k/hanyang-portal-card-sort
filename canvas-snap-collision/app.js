@@ -1,4 +1,4 @@
-import { integrated, urls } from '../study/flow.js?v=journey-3';
+import { integrated, urls } from '../study/flow.js?v=required-practice-6';
 import { cardNames } from '../test/cards.js';
 import { testDescriptions } from '../test/descriptions.js';
 
@@ -120,7 +120,7 @@ function restoreHistory(entry) {
 }
 function ensureGroups() {
   state.review ||= inferGroups();
-  state.review.groups.forEach((group, i) => { group.tone ??= i % 4; });
+  state.review.groups.forEach((group, i) => { group.tone ??= i % 4; group.nameProvided ??= !!group.name?.trim() && !/^그룹 \d+$/.test(group.name); });
   return state.review;
 }
 function refreshSingles() {
@@ -227,7 +227,7 @@ document.querySelector('#single-group-form').addEventListener('submit', event =>
   if (!requestedName) while (review.groups.some(group => group.name === `그룹 ${number}`)) number++;
   const name = requestedName || `그룹 ${number}`;
   review.nextGroup = number + 1;
-  review.groups.push({ id: crypto.randomUUID(), name, tone: [0, 1, 2, 3].find(tone => !review.groups.some(group => group.tone === tone)) ?? number % 4, cardIds: [detailCardId] });
+  review.groups.push({ id: crypto.randomUUID(), name, nameProvided: !!requestedName, tone: [0, 1, 2, 3].find(tone => !review.groups.some(group => group.tone === tone)) ?? number % 4, cardIds: [detailCardId] });
   refreshSingles(); closeCardDetail(); invalidate(); paint(); save(); announce('한 장짜리 그룹을 만들었다.'); practiceAction('singleton');
 });
 function selectedCardGroup() { return detailCardId && ensureGroups().groups.find(group => group.cardIds.includes(detailCardId)); }
@@ -251,6 +251,7 @@ document.querySelector('#rename-group-form').addEventListener('submit', event =>
     remember(copy(state.positions)); group.name = name; invalidate(); paint(); save();
     document.querySelector('#detail-group-name').textContent = name; announce('그룹 이름을 변경했습니다.'); practiceAction('rename');
   }
+  if (name) { group.nameProvided = true; save(); }
   cancelRename();
 });
 function detachedPosition(id) {
@@ -627,7 +628,8 @@ function edgePan() {
 function stopAnimation() { if (animation) cancelAnimationFrame(animation); animation = null; }
 
 viewport.addEventListener('pointerdown', event => {
-  if (event.button !== 0 || reviewDialog.open || pointers.size >= 2) return;
+  const middlePan = event.pointerType === 'mouse' && event.button === 1;
+  if ((!middlePan && event.button !== 0) || reviewDialog.open || pointers.size >= 2 || (middlePan && pointers.size)) return;
   closeCardDetail();
   cancelHold();
   hint.classList.add('hidden');
@@ -642,7 +644,7 @@ viewport.addEventListener('pointerdown', event => {
     gesture = { type: 'pinch', distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), scale: state.view.scale, anchor: { x: (center.x - state.view.x) / state.view.scale, y: (center.y - state.view.y) / state.view.scale } };
     paint(); return;
   }
-  const id = event.target.closest('.card')?.dataset.id;
+  const id = middlePan ? null : event.target.closest('.card')?.dataset.id;
   const start = { x: event.clientX, y: event.clientY };
   if (id) {
     cardsElement.querySelector(`[data-id="${id}"]`).classList.remove('settling', 'snap-settling');
@@ -722,6 +724,7 @@ window.addEventListener('blur', () => {
   pointers.clear(); gesture = null; stopAnimation(); paint(); save();
 });
 viewport.addEventListener('contextmenu', event => event.preventDefault());
+viewport.addEventListener('auxclick', event => { if (event.button === 1) event.preventDefault(); });
 viewport.addEventListener('wheel', event => {
   closeCardDetail();
   event.preventDefault(); hint.classList.add('hidden');
@@ -785,7 +788,7 @@ function reviewRows(ids) {
 }
 function renderReview() {
   const result = state.review;
-  reviewDialog.innerHTML = `<div class="review-heading"><h1>그룹 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><p class="review-name-help">각 그룹에 어울리는 이름을 작성해 주세요. 그룹 이름을 누르면 수정할 수 있습니다.</p><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group group-surface tone-${group.tone ?? index % 4}"><div class="review-group-heading group-heading"><label><span class="sr-only">그룹 이름</span><input type="text" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="그룹 이름" maxlength="60" aria-label="${index + 1}번째 그룹 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">완료</button></div>`;
+  reviewDialog.innerHTML = `<div class="review-heading"><h1>그룹 확인</h1><button type="button" class="close-review" data-action="back" aria-label="닫기">×</button></div><div class="review-scroll"><p class="review-name-help">각 그룹에 어울리는 이름을 작성해 주세요. 임시 이름이 남아 있으면 완료할 수 없습니다.</p><div class="review-groups">${result.groups.map((group, index) => `<section class="review-group group-surface tone-${group.tone ?? index % 4}"><div class="review-group-heading group-heading"><label><span class="sr-only">그룹 이름</span><input type="text" required aria-describedby="group-name-error" data-group-name="${group.id}" value="${escape(group.name)}" placeholder="그룹 이름" maxlength="60" aria-label="${index + 1}번째 그룹 이름"></label></div>${reviewRows(group.cardIds)}</section>`).join('')}</div>${result.singles.length ? `<section class="single-section"><h2>따로 둔 카드</h2><div class="single-cards">${reviewRows(result.singles)}</div></section>` : ''}</div><p id="group-name-error" class="group-name-error" role="alert" hidden></p><div class="review-actions"><button type="button" class="back-button" data-action="back">돌아가기</button><button type="button" class="confirm-button" data-action="confirm">완료</button></div>`;
 }
 function showReview() {
   ensureGroups();
@@ -821,6 +824,14 @@ document.addEventListener('click', event => {
   else if (action === 'review') showReview();
   else if (action === 'back') { reviewDialog.close(); updateControls(); save(); }
   else if (action === 'confirm') {
+    if (practice && !window.dispatchEvent(new Event('practice-before-confirm', { cancelable: true }))) { notify('안내된 필수 조작을 먼저 완료해 주세요.'); return; }
+    const unnamed = state.review.groups.find(group => !group.name.trim() || !group.nameProvided);
+    if (unnamed) {
+      const error = reviewDialog.querySelector('#group-name-error');
+      error.textContent = '모든 그룹의 이름을 작성해 주세요.'; error.hidden = false;
+      const input = [...reviewDialog.querySelectorAll('[data-group-name]')].find(input => input.dataset.groupName === unnamed.id);
+      input.setAttribute('aria-invalid', 'true'); input.focus(); input.select(); return;
+    }
     state.review.groups.forEach((g, i) => { g.name = g.name.trim() || `그룹 ${i + 1}`; });
     const ids = [...state.review.singles, ...state.review.groups.flatMap(g => g.cardIds)];
     if (ids.length !== catalog.length || new Set(ids).size !== catalog.length) { notify('카드 분류를 다시 확인해야 한다.'); return; }
@@ -833,7 +844,7 @@ document.addEventListener('click', event => {
 });
 reviewDialog.addEventListener('input', event => {
   const group = state.review.groups.find(g => g.id === event.target.dataset.groupName);
-  if (group) { future = []; group.name = event.target.value; state.confirmed = false; drawOutlines(); updateControls(); save(); }
+  if (group) { future = []; group.name = event.target.value; group.nameProvided = !!group.name.trim(); event.target.removeAttribute('aria-invalid'); reviewDialog.querySelector('#group-name-error').hidden = true; state.confirmed = false; drawOutlines(); updateControls(); save(); }
 });
 window.addEventListener('resize', () => { paint(); positionCardDetail(); });
 setTimeout(() => hint.classList.add('hidden'), 6500);

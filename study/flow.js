@@ -1,6 +1,6 @@
 export const integrated = new URLSearchParams(location.search).get('flow') === 'study';
 export const urls = {pre:'../survey/?flow=study&step=pre&v=journey-3',cards:'../canvas-snap-collision/?flow=study&step=cards&resume=post-survey&v=journey-3', 'post-1':'../post-survey/?flow=study&step=post-1&stage=groups&v=journey-3','post-3':'../post-survey/?flow=study&step=post-3&stage=questions&v=journey-3','post-2':'../post-survey/?flow=study&step=post-2&stage=select&v=journey-3'};
-let practiceDone=false;try{practiceDone=sessionStorage.getItem('hyu-study-practice-done')==='1';}catch{}
+let practiceDone=false;try{practiceDone=sessionStorage.getItem('hyu-study-practice-done-required-v1')==='1';}catch{}
 if(!practiceDone) urls.cards += '&practice=1';
 const steps=['pre','cards','post-1','post-2','post-3'], labels=['사전 설문','카드 분류','사후 질문 1','사후 질문 2','사후 질문 3'];
 let current=new URLSearchParams(location.search).get('step')||'pre', frozen=false;

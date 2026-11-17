@@ -1,7 +1,7 @@
 export function installDescriptions(cards) {
  const byId=new Map(cards.map(card=>[card.id,card]));
  const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const style=document.createElement('link');style.rel='stylesheet';style.href='../study/descriptions.css?v=usability-2';document.head.append(style);
+ const style=document.createElement('link');style.rel='stylesheet';style.href='../study/descriptions.css?v=required-practice-6';document.head.append(style);
  const dialog=document.createElement('dialog');dialog.className='function-description';dialog.setAttribute('aria-labelledby','function-description-title');
  dialog.innerHTML='<button type="button" class="description-close" aria-label="설명 닫기">×</button><h2 id="function-description-title"></h2><p></p>';document.body.append(dialog);
  let trigger;

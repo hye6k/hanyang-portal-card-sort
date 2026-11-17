@@ -1,5 +1,5 @@
-import { installDescriptions } from '../study/descriptions.js?v=usability-2';
-import { integrated, urls, updateFlow } from '../study-50/flow.js?v=tutorial-card-side-5';
+import { installDescriptions } from '../study/descriptions.js?v=required-practice-6';
+import { integrated, urls, updateFlow } from '../study-50/flow.js?v=required-practice-6';
 import { cards as selectedCards } from '../canvas-50/cards.js';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
@@ -66,9 +66,9 @@ function renderSelection() {
 }
 function renderGroupReasons() {
   const groups = state.sort?.groups || [];
-  byId('group-reasons').innerHTML = groups.length ? groups.map((group, i) => `<section class="group-response group-surface tone-${group.tone ?? i % 4}" data-question="group-${i}"><div class="group-heading"><h3>${esc(group.name)}</h3></div><ul class="group-response-cards" aria-label="그룹에 속한 기능">${group.card_ids.map(id => `<li class="group-item menu-with-description"><span>${esc(cardName(id))}</span>${descriptionButton(id)}</li>`).join('')}</ul><div class="group-response-form"><label for="group-reason-${i}">분류한 이유</label><textarea id="group-reason-${i}" data-group-reason="${esc(group.id)}" rows="2" maxlength="800" aria-describedby="group-${i}-error">${esc(state.answers.group_reasons[group.id] || '')}</textarea><p class="field-error" id="group-${i}-error" hidden></p></div></section>`).join('') : '<p class="source-empty">만든 그룹이 없습니다. 다음으로 넘어가거나 카드 분류로 돌아가 그룹을 만들 수 있습니다.</p>';
+  byId('group-reasons').innerHTML = groups.length ? groups.map((group, i) => `<section class="group-response group-surface tone-${group.tone ?? i % 4}" data-question="group-${i}"><div class="group-heading"><h3>${esc(group.name)}</h3></div><ul class="group-response-cards" aria-label="그룹에 속한 기능">${group.card_ids.map(id => `<li class="group-item menu-with-description"><span>${esc(cardName(id))}</span>${descriptionButton(id)}</li>`).join('')}</ul><details class="group-response-form" ${state.answers.group_reasons[group.id]?.trim() ? 'open' : ''}><summary>설명 추가 (선택)</summary><label for="group-reason-${i}">이름만으로 표현하기 어려운 분류 기준이 있다면 적어 주세요.</label><textarea id="group-reason-${i}" data-group-reason="${esc(group.id)}" rows="2" maxlength="800" aria-describedby="group-${i}-error">${esc(state.answers.group_reasons[group.id] || '')}</textarea><p class="field-error" id="group-${i}-error" hidden></p></details></section>`).join('') : '<p class="source-empty">만든 그룹이 없습니다. 다음으로 넘어가거나 카드 분류로 돌아가 그룹을 만들 수 있습니다.</p>';
 }
-function groupErrors() { return (state.sort?.groups || []).flatMap((group, i) => state.answers.group_reasons[group.id]?.trim() ? [] : [[`group-${i}`, '이 그룹으로 분류한 이유를 간단히 적어 주세요.']]); }
+function groupErrors() { return []; }
 byId('clarity-options').innerHTML = clarityLabels.map((label, i) => `<label class="scale-option"><input type="radio" name="clarity" value="${i + 1}"><span class="scale-number">${i + 1}</span><span class="scale-label">${esc(label)}</span></label>`).join('');
 byId('criterion-options').innerHTML = criteria.map(([value, label]) => `<label class="choice"><input type="checkbox" name="criterion" value="${value}"><span>${esc(label)}</span></label>`).join('');
 function reasonMarkup(kind, id) {
@@ -149,7 +149,7 @@ function syncUI() {
   byId('edit-groups').disabled = frozen; byId('edit-groups').textContent = state.sort ? '← 그룹 수정' : '← 카드 분류 시작';
   byId('criterion-other-field').hidden = !state.answers.criterion.includes('other'); byId('criterion-other').disabled = !state.answers.criterion.includes('other');
   byId('pending-note').hidden = !state.pending || submitting;
-  byId('page-title').textContent = state.done ? '제출 완료' : groups ? '그룹으로 묶은 이유' : questions ? '어려웠던 이유와 분류 기준' : '분류하면서 어려웠던 메뉴'; document.title = byId('page-title').textContent;
+  byId('page-title').textContent = state.done ? '제출 완료' : groups ? '그룹 이름과 설명' : questions ? '어려웠던 이유와 분류 기준' : '분류하면서 어려웠던 메뉴'; document.title = byId('page-title').textContent;
   document.querySelectorAll('[data-step]').forEach(el => { if (el.dataset.step === state.stage) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current'); });
   form.hidden = state.done; byId('complete-panel').hidden = !state.done; byId('edit-groups').hidden = state.done;
   if (!form.querySelector('[data-invalid]')) byId('validation-summary').hidden = true;
