@@ -1,7 +1,7 @@
-import { integrated, urls } from '../study-50/flow.js?v=descriptions-7';
-import { cards as selectedCards } from './cards.js?v=descriptions-7';
+import { integrated, urls, cleanRoute, practiceRoute } from '../study-50/flow.js?v=clean-routes-8';
+import { cards as selectedCards } from './cards.js?v=clean-routes-8';
 
-const practice = new URLSearchParams(location.search).get('practice') === '1';
+const practice = practiceRoute;
 const CARD_W = 144, CARD_H = 70, GAP = 24;
 const CARD_CLEARANCE = 8, COLLISION_RADIUS = 16;
 const GROUP_PADDING = 20, GROUP_RADIUS = 18, GROUP_OUTLINE_GAP = 12;
@@ -65,7 +65,7 @@ if (state.groupTerminologyVersion !== 1) {
   state.groupTerminologyVersion = 1;
 }
 state.descriptionViews ||= {};
-if (new URLSearchParams(location.search).get('resume') !== 'post-survey') state.view = overviewView(state.positions);
+if (!cleanRoute && new URLSearchParams(location.search).get('resume') !== 'post-survey') state.view = overviewView(state.positions);
 const pointers = new Map();
 let gesture = null;
 let animation = null;

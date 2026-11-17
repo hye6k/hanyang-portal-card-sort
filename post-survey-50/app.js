@@ -1,6 +1,6 @@
-import { installDescriptions } from '../study/descriptions.js?v=descriptions-7';
-import { integrated, urls, updateFlow } from '../study-50/flow.js?v=descriptions-7';
-import { cards as selectedCards } from '../canvas-50/cards.js?v=descriptions-7';
+import { installDescriptions } from '../study/descriptions.js?v=clean-routes-8';
+import { integrated, urls, updateFlow, cleanRoute } from '../study-50/flow.js?v=clean-routes-8';
+import { cards as selectedCards } from '../canvas-50/cards.js?v=clean-routes-8';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
 
@@ -48,7 +48,8 @@ for (const kind of ['difficult', 'naming']) {
   state.answers[kind].forEach(id => { state.answers[`${kind}_reasons`][id] ||= { selected: [], other: '' }; });
 }
 if (!state.pending && !state.done) state.sort = readSort();
-const requestedStage = new URLSearchParams(location.search).get('stage');
+function stageFromUrl() { return cleanRoute ? ({'post-1':'groups','post-2':'select','post-3':'questions'})[location.pathname.split('/').filter(Boolean).pop()] : new URLSearchParams(location.search).get('stage'); }
+const requestedStage = stageFromUrl();
 if (['groups', 'select', 'questions'].includes(requestedStage)) state.stage = requestedStage;
 if (state.pending) state.stage = 'questions';
 if (!['groups', 'select', 'questions'].includes(state.stage)) state.stage = 'groups';
@@ -155,7 +156,7 @@ function syncUI() {
   if (!form.querySelector('[data-invalid]')) byId('validation-summary').hidden = true;
 }
 function saveCurrent() { if (!state.pending && !state.done) state.answers = readAnswers(); state.scroll[state.stage] = scrollY; persist(); }
-function stageUrl(stage) { const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'journey-3'); url.searchParams.delete('from'); if (integrated) url.searchParams.set('step',stage === 'groups' ? 'post-1' : stage === 'questions' ? 'post-3' : 'post-2'); return url.pathname + url.search; }
+function stageUrl(stage) { if(cleanRoute)return urls[{'groups':'post-1','select':'post-2','questions':'post-3'}[stage]]; const url = new URL(location.href); url.searchParams.set('stage', stage); url.searchParams.set('v', 'journey-3'); url.searchParams.delete('from'); if (integrated) url.searchParams.set('step',stage === 'groups' ? 'post-1' : stage === 'questions' ? 'post-3' : 'post-2'); return url.pathname + url.search; }
 function showStage(stage, push = true) {
   saveCurrent(); state.stage = stage; persist();
   if (push) history.pushState({ stage }, '', stageUrl(stage));
@@ -193,7 +194,7 @@ form.addEventListener('submit', async event => {
   catch { byId('submit-error').textContent = '저장 완료를 확인하지 못했습니다. 연결 상태를 확인한 뒤 다시 제출해 주세요. 작성한 응답은 유지됩니다.'; byId('submit-error').hidden = false; }
   finally { submitting = false; syncUI(); }
 });
-window.addEventListener('popstate', () => { saveCurrent(); let stage = new URLSearchParams(location.search).get('stage'); if (!['groups','select','questions'].includes(stage)) stage = 'groups'; if (state.pending || state.done) stage = 'questions'; if (!state.pending && !state.done && !state.sort) stage = 'select'; showStage(stage, false); });
+window.addEventListener('popstate', () => { saveCurrent(); let stage = stageFromUrl(); if (!['groups','select','questions'].includes(stage)) stage = 'groups'; if (state.pending || state.done) stage = 'questions'; if (!state.pending && !state.done && !state.sort) stage = 'select'; showStage(stage, false); });
 window.addEventListener('pagehide', saveCurrent);
 window.addEventListener('pageshow', event => { if (!event.persisted || state.pending || state.done) return; state.sort = readSort(); renderSelection(); renderGroupReasons(); restoreFields(); state.stage = 'groups'; syncUI(); persist(); history.replaceState({ stage: state.stage }, '', stageUrl(state.stage)); requestAnimationFrame(() => window.scrollTo({ top: state.scroll.groups || 0, behavior: 'instant' })); });
 renderSelection(); renderGroupReasons(); restoreFields();
