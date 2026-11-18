@@ -1,4 +1,4 @@
-import {has,object,recordsFrom,inspect,fields} from './data.js?v=inspection-2';
+import {has,object,recordsFrom,inspect,fields} from './data.js?v=inspection-3';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const MISSING=Symbol('missing'),arr=v=>Array.isArray(v)?v:[],get=(o,k)=>has(o,k)?o[k]:MISSING;
 let sources=[],entries=[],current=null;
@@ -16,8 +16,9 @@ function scale(selected,dict){const map=object(dict),keys=Object.keys(map);if(!k
 function consent(v){return `<p class="check-state">동의 여부: ${esc(value(v))}</p>`;}
 function showPre(pre,preRow,p){
  if(!has(p,'pre_survey'))return '<p class="muted">사전 설문 항목이 없습니다.</p>';
+ if(pre.skipped===true)return '<p class="muted">사전 설문 응답이 없습니다.</p>';
  const a=object(pre.answers),q=object(pre.questionnaire),participant=object(pre.participant);
- return `${dl([['사전 설문 ID',get(preRow,'id')],['사전 설문 버전',get(preRow,'study_version')],['사전 설문 is_test',get(preRow,'is_test')],['건너뛰기',get(pre,'skipped')],['건너뛴 이유',get(pre,'reason')],['건너뛴 시각',get(pre,'skipped_at_client')],['사전 설문 시작',get(pre,'started_at')],['사전 설문 제출',get(pre,'submitted_at_client')]])}
+ return `${dl([['사전 설문 ID',get(preRow,'id')],['사전 설문 버전',get(preRow,'study_version')],['사전 설문 is_test',get(preRow,'is_test')],['사전 설문 시작',get(pre,'started_at')],['사전 설문 제출',get(pre,'submitted_at_client')]])}
  ${entry('01 기본정보',`<div class="identity-fields">${[['학번','student_number'],['학과','department'],['이름','name']].map(([label,key])=>`<div><span class="field-label">${label}</span>${answer(get(participant,key))}</div>`).join('')}</div>`)}
  ${entry('02 한양대학교 포털을 얼마나 자주 사용하나요?',options(get(a,'portal_frequency'),q.frequency))}
  ${entry('03 원하는 메뉴를 찾는 데 어려움을 겪은 경험이 있나요?',scale(get(a,'navigation_difficulty_frequency'),q.difficulty_scale))}
@@ -26,7 +27,10 @@ function showPre(pre,preRow,p){
  ${entry('정보 수집 및 응답 제출 동의',consent(get(pre,'consent')))}`;
 }
 function cardName(cards,id){return cards.find(c=>c.id===id)?.name??`목록에 없는 카드: ${id}`;}
-function groupRender(g,i,cards,reasons){const members=arr(g.card_ids);return `<article class="group-surface tone-${Number.isInteger(g.tone)&&g.tone>=0&&g.tone<=3?g.tone:i%4}"><div class="group-heading"><h3>${esc(value(get(g,'name')))}</h3><span>${members.length}개</span></div>${members.map(id=>`<div class="group-item">${esc(cardName(cards,id))}<small>${esc(id)}</small></div>`).join('')}<div class="group-foot">${dl([['그룹 ID',get(g,'id')],['저장된 색상',get(g,'tone')],['추가 설명',reasons.find(r=>r.group_id===g.id)?.reason??MISSING]])}</div></article>`;}
+function groupRender(g,i,cards,reasons,showMeta=true){
+ const members=arr(g.card_ids),reason=reasons.find(r=>r.group_id===g.id)?.reason,hasReason=typeof reason==='string'&&reason.trim().length>0;
+ return `<article class="group-surface tone-${Number.isInteger(g.tone)&&g.tone>=0&&g.tone<=3?g.tone:i%4}"><div class="group-heading"><h3>${esc(value(get(g,'name')))}</h3><span>${members.length}개</span></div>${members.map(id=>`<div class="group-item">${esc(cardName(cards,id))}${showMeta?`<small>${esc(id)}</small>`:''}</div>`).join('')}${showMeta||hasReason?`<div class="group-foot">${dl([...(showMeta?[['그룹 ID',get(g,'id')],['저장된 색상',get(g,'tone')]]:[]),...(hasReason?[['추가 설명',reason]]:[])])}</div>`:''}</article>`;
+}
 function showSort(sort,cards,a){
  const groups=arr(sort.groups),singles=arr(sort.ungrouped_card_ids),all=[...groups.flatMap(g=>arr(g.card_ids)),...singles],known=new Set(cards.map(c=>c.id));
  const absent=cards.filter(c=>!all.includes(c.id)),duplicates=[...new Set(all.filter((id,i)=>all.indexOf(id)!==i))],unknown=all.filter(id=>!known.has(id));
@@ -35,7 +39,7 @@ function showSort(sort,cards,a){
 }
 function showPost(p,cards){const a=object(p.answers),q=object(p.questionnaire);
  const selected=(key,none,reasonDict)=>`<p class="check-state">없음으로 저장: ${esc(value(get(a,none)))}</p>${!has(a,key)?answer(MISSING):!arr(a[key]).length?answer(a[key]):arr(a[key]).map(item=>`<div class="view-row"><h4>${esc(cardName(cards,item.card_id))}</h4>${dl([['카드 ID',get(item,'card_id')]])}${options(get(item,'reasons'),q[reasonDict],{multiple:true})}<h4>기타 이유</h4>${answer(get(item,'other'))}</div>`).join('')}`;
- return `${entry('사후 질문 1 · 그룹 이름과 추가 설명',!has(a,'group_reasons')?answer(MISSING):arr(a.group_reasons).length?arr(a.group_reasons).map((r,i)=>`<div class="view-row"><h4>${i+1}. ${esc(value(get(r,'group_name')))}</h4>${dl([['그룹 ID',get(r,'group_id')],['카드 목록',get(r,'card_ids')]])}<h4>추가 설명</h4>${answer(get(r,'reason'))}</div>`).join(''):answer(a.group_reasons))}
+ return `${entry('사후 질문 1 · 그룹 이름과 추가 설명',!has(a,'group_reasons')?answer(MISSING):arr(a.group_reasons).length?arr(a.group_reasons).map((r,i)=>groupRender({id:r.group_id,name:r.group_name,card_ids:r.card_ids,tone:arr(object(p.sort_result).groups).find(g=>g.id===r.group_id)?.tone},i,cards,[r],false)).join(''):answer(a.group_reasons))}
  ${entry('사후 질문 2 · 분류가 어려웠던 메뉴',selected('difficult_cards','difficult_none','sorting_reasons'))}
  ${entry('사후 질문 2 · 명칭을 이해하기 어려웠던 메뉴',selected('naming_difficult_cards','naming_none','naming_reasons'))}
  ${entry('사후 질문 3 · 카드에 적힌 명칭만으로 기능을 이해할 수 있었나요?',scale(get(a,'label_comprehension'),q.label_comprehension_scale))}
