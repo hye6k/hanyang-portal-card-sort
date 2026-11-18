@@ -8,8 +8,3 @@ export function recordsFrom(root){
  return [{value:base,path:'$'}];
 }
 export function inspect(value){const row=object(value),payload=has(row,'payload')?object(row.payload):row,preRow=object(payload.pre_survey),pre=has(preRow,'payload')?object(preRow.payload):preRow;return {row,payload,preRow,pre};}
-export function fields(value,path='$'){
- const type=value===null?'null':Array.isArray(value)?'array':typeof value;
- const children=type==='array'||type==='object'?Object.entries(value):[];
- return [{path,type,value,container:type==='array'||type==='object'},...children.flatMap(([key,v])=>fields(v,Array.isArray(value)?`${path}[${key}]`:`${path}[${JSON.stringify(key)}]`))];
-}
