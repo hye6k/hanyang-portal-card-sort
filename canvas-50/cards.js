@@ -1,19 +1,19 @@
-// Original menu names from the team sheet; descriptions normalized for the demo (2026-11-17, v2).
+// Original menu names from the team sheet; descriptions revised with portal screenshots and documentation (2026-11-18, v3).
 export const cards = [
   {
     "id": "menu-1",
     "name": "내 강의실",
-    "description": "필수교육 여부 및 연도·학기별 수강 강의 목록 확인"
+    "description": "필수교육 이수 여부와 학기별 수강 강의 확인 및 수업홈·강의평가·강의계획서 이용"
   },
   {
     "id": "menu-4",
     "name": "학생포트폴리오",
-    "description": "학기별 성적 현황 및 개인정보 조회"
+    "description": "개인정보·학적·성적·교내외 활동 등 학생 정보 종합 조회"
   },
   {
     "id": "menu-5",
     "name": "비교과영역관리",
-    "description": "어학능력시험·교외 수상·자격증 내역 조회"
+    "description": "어학 성적·수상·자격증 내역 관리"
   },
   {
     "id": "menu-7",
@@ -23,7 +23,7 @@ export const cards = [
   {
     "id": "menu-8",
     "name": "졸업사정조회",
-    "description": "졸업에 필요한 전공 및 이수 분야별 학점 현황 조회"
+    "description": "졸업요건별 충족 여부 및 미충족 항목 확인"
   },
   {
     "id": "menu-14",
@@ -63,7 +63,7 @@ export const cards = [
   {
     "id": "menu-39",
     "name": "교과목포트폴리오",
-    "description": "교과목별 수강 인원·평점·강의평가 결과 조회"
+    "description": "교과목 개요 및 수강·성적·강의평가 현황 조회"
   },
   {
     "id": "menu-42",
@@ -73,7 +73,7 @@ export const cards = [
   {
     "id": "menu-47",
     "name": "사회봉사성적조회",
-    "description": "봉사활동 이수 결과 및 학점 확인"
+    "description": "사회봉사 교과목의 평가 결과 및 이수 여부 조회"
   },
   {
     "id": "menu-48",
@@ -103,7 +103,7 @@ export const cards = [
   {
     "id": "menu-74",
     "name": "학점포기신청",
-    "description": "이미 취득한 과목의 성적 취소 신청"
+    "description": "포기 가능한 과목 조회 및 취득 학점·성적 포기 신청"
   },
   {
     "id": "menu-78",
@@ -113,12 +113,12 @@ export const cards = [
   {
     "id": "menu-80",
     "name": "트랙신청/내역확인",
-    "description": "소단위 전공 과정 선택 및 신청 내역 확인"
+    "description": "마이크로전공·트랙 신청 및 신청·이수 내역 확인"
   },
   {
     "id": "menu-82",
     "name": "인턴십신청",
-    "description": "기업·기관 현장실습 참여 신청"
+    "description": "단기·장기 인턴십 및 창업현장실습 신청"
   },
   {
     "id": "menu-84",
@@ -153,7 +153,7 @@ export const cards = [
   {
     "id": "menu-105",
     "name": "생활관입사신청",
-    "description": "개강 전 생활관 입사 신청"
+    "description": "생활관 입사 신청"
   },
   {
     "id": "menu-107",
@@ -193,7 +193,7 @@ export const cards = [
   {
     "id": "menu-135",
     "name": "예비군훈련신청",
-    "description": "군 복무를 마친 학생의 예비군 신청"
+    "description": "학생예비군 훈련 일정 선택 및 참가 신청"
   },
   {
     "id": "menu-142",
@@ -213,7 +213,7 @@ export const cards = [
   {
     "id": "menu-145",
     "name": "납부금내역조회",
-    "description": "등록금 외 학교 납부 내역 조회"
+    "description": "학생회비 등 납부금 내역 조회"
   },
   {
     "id": "menu-148",
@@ -233,7 +233,7 @@ export const cards = [
   {
     "id": "menu-160",
     "name": "행사신청",
-    "description": "교내 행사 참여 신청 및 취소"
+    "description": "교수학습 관련 행사 참여 신청"
   },
   {
     "id": "menu-172",

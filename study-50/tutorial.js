@@ -1,9 +1,9 @@
-import {integrated,cleanRoute,practiceRoute,urls} from '../study-50/flow.js?v=experiment-intro-9';
+import {integrated,cleanRoute,practiceRoute,urls} from '../study-50/flow.js?v=verified-descriptions-10';
 const practice=practiceRoute;
 const actual=new URL(cleanRoute?urls.actual:location.href,location.origin);
-if(!cleanRoute){actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','experiment-intro-9');}
+if(!cleanRoute){actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','verified-descriptions-10');}
 const training=new URL(cleanRoute?urls.tutorial:actual,location.origin);if(!cleanRoute)training.searchParams.set('practice','1');
-const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=experiment-intro-9';document.head.append(css);
+const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=verified-descriptions-10';document.head.append(css);
 if(!practice){
  const help=document.createElement('button');help.className='practice-help';help.textContent='사용 방법';help.addEventListener('click',()=>location.assign(training));document.body.append(help);
 }else{

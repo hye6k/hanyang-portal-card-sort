@@ -1,6 +1,6 @@
-import { installDescriptions } from '../study/descriptions.js?v=experiment-intro-9';
-import { integrated, urls, updateFlow, cleanRoute } from '../study-50/flow.js?v=experiment-intro-9';
-import { cards as selectedCards } from '../canvas-50/cards.js?v=experiment-intro-9';
+import { installDescriptions } from '../study/descriptions.js?v=verified-descriptions-10';
+import { integrated, urls, updateFlow, cleanRoute } from '../study-50/flow.js?v=verified-descriptions-10';
+import { cards as selectedCards } from '../canvas-50/cards.js?v=verified-descriptions-10';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
 

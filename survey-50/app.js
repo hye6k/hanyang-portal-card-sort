@@ -1,4 +1,4 @@
-import { integrated, urls } from '../study-50/flow.js?v=experiment-intro-9';
+import { integrated, urls } from '../study-50/flow.js?v=verified-descriptions-10';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
 

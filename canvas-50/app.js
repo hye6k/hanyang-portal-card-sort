@@ -1,5 +1,5 @@
-import { integrated, urls, cleanRoute, practiceRoute } from '../study-50/flow.js?v=experiment-intro-9';
-import { cards as selectedCards } from './cards.js?v=experiment-intro-9';
+import { integrated, urls, cleanRoute, practiceRoute } from '../study-50/flow.js?v=verified-descriptions-10';
+import { cards as selectedCards } from './cards.js?v=verified-descriptions-10';
 
 const practice = practiceRoute;
 const CARD_W = 144, CARD_H = 70, GAP = 24;
@@ -204,7 +204,7 @@ function openCardDetail(id) {
   detailPanel.hidden = false; positionCardDetail();
   document.querySelector('#close-card-detail').focus({ preventScroll: true });
   const now = new Date().toISOString(), previous = state.descriptionViews[id];
-  state.descriptionViews[id] = { count: (previous?.count || 0) + 1, firstViewedAt: previous?.firstViewedAt || now, lastViewedAt: now, descriptionVersion: practice ? 'practice-v1' : 'portal-selected-50-descriptions-v2' };
+  state.descriptionViews[id] = { count: (previous?.count || 0) + 1, firstViewedAt: previous?.firstViewedAt || now, lastViewedAt: now, descriptionVersion: practice ? 'practice-v1' : 'portal-selected-50-descriptions-v3' };
   save(); practiceAction('description');
 }
 document.querySelector('#close-card-detail').addEventListener('click', () => closeCardDetail(true));
