@@ -92,6 +92,9 @@ function syncReasonBlocks() {
       const hasOther = state.answers[`${kind}_reasons`][id]?.selected.includes('other');
       block.querySelector('[data-other-field]').hidden = !hasOther; block.querySelector('[data-other]').disabled = !hasOther;
     }
+    // Selection changes must not change the order of the two reason questions.
+    const blocks = ['difficult', 'naming'].map(kind => questions.querySelector(`[data-reason-kind="${kind}"]`)).filter(Boolean);
+    blocks.forEach((block, index) => { const at = questions.children[index]; if (at !== block) questions.insertBefore(block, at || null); });
   });
   byId('menu-reasons-section').hidden = !selected.length;
 }
