@@ -1,5 +1,5 @@
-import { integrated, urls, cleanRoute, practiceRoute } from '../study-50/flow.js?v=verified-descriptions-10';
-import { cards as selectedCards } from './cards.js?v=verified-descriptions-10';
+import { integrated, urls, cleanRoute, practiceRoute, official, storageKeys, sortStorage } from '../study-50/flow.js?v=official-12';
+import { cards as selectedCards } from './cards.js?v=official-12';
 
 const practice = practiceRoute;
 const CARD_W = 144, CARD_H = 70, GAP = 24;
@@ -16,7 +16,7 @@ const reviewDialog = document.querySelector('#review');
 const hint = document.querySelector('#hint');
 const detailPanel = document.querySelector('#card-detail');
 let detailCardId = null;
-const storageKey = practice ? 'hyu-card-sort-selected-50-practice-v1' : 'hyu-spatial-card-sort-selected-50-v1';
+const storageKey = practice ? storageKeys.practice : storageKeys.sort;
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const cardName = id => catalog.find(card => card.id === id)?.name || '';
@@ -54,7 +54,7 @@ function valid(value) {
   }) && value.view && ['x', 'y', 'scale'].every(k => Number.isFinite(value.view[k])) && value.view.scale >= 0.01 && value.view.scale <= 2.5;
 }
 let state;
-try { const value = JSON.parse((practice ? sessionStorage : localStorage).getItem(storageKey) || 'null'); if (valid(value)) state = value; } catch {}
+try { const value = JSON.parse((practice ? sessionStorage : sortStorage()).getItem(storageKey) || 'null'); if (valid(value)) state = value; } catch {}
 if (state && isUntouchedOldGrid(state)) {
   const order = [...catalog].sort((a, b) => state.positions[a.id].y - state.positions[b.id].y || state.positions[a.id].x - state.positions[b.id].x);
   state = initial(order);
@@ -96,7 +96,7 @@ function armGroupHold() {
   }, 500);
 }
 
-function save() { try { (practice ? sessionStorage : localStorage).setItem(storageKey, JSON.stringify(state)); } catch {} if(practice) window.dispatchEvent(new CustomEvent('practice-state',{detail:{review:state.review,views:state.descriptionViews}})); }
+function save() { try { (practice ? sessionStorage : sortStorage()).setItem(storageKey, JSON.stringify(state)); } catch {} if(practice) window.dispatchEvent(new CustomEvent('practice-state',{detail:{review:state.review,views:state.descriptionViews}})); }
 function practiceAction(type) { if (practice) window.dispatchEvent(new CustomEvent('practice-action',{detail:type})); }
 function announce(text) { document.querySelector('#announcer').textContent = text; }
 function notify(text) { const el = document.querySelector('#toast'); clearTimeout(toastTimer); el.textContent = text; el.classList.add('visible'); toastTimer = setTimeout(() => el.classList.remove('visible'), 2600); announce(text); }
@@ -797,7 +797,7 @@ function resetTest() {
   if (reviewDialog.open) reviewDialog.close();
   reviewDialog.innerHTML = '';
   document.querySelector('#toast').classList.remove('visible');
-  try { (practice ? sessionStorage : localStorage).removeItem(storageKey); } catch {}
+  try { (practice ? sessionStorage : sortStorage()).removeItem(storageKey); } catch {}
   state = initial();
   renderCards(); save();
   announce('저장된 배치와 분류를 지우고 다시 시작했다.');
@@ -808,7 +808,7 @@ document.addEventListener('click', event => {
   if (!button || button.disabled) return;
   const action = button.dataset.action;
   closeCardDetail();
-  if (action === 'reset-test') resetTest();
+  if (action === 'reset-test' && (!official || practice)) resetTest();
   else if (action === 'fit') { fitAll(); practiceAction('fit'); }
   else if (action === 'undo' && history.length) {
     future.push(historySnapshot());
@@ -846,3 +846,5 @@ reviewDialog.addEventListener('input', event => {
 window.addEventListener('resize', () => { paint(); positionCardDetail(); });
 setTimeout(() => hint.classList.add('hidden'), 6500);
 renderCards(); drawOutlines(); save();
+
+window.addEventListener('practice-reset', () => { if (practice) resetTest(); });

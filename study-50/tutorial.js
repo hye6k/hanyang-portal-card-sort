@@ -1,9 +1,9 @@
-import {integrated,cleanRoute,practiceRoute,urls} from '../study-50/flow.js?v=verified-descriptions-10';
+import {integrated,cleanRoute,practiceRoute,urls,storageKeys} from '../study-50/flow.js?v=official-12';
 const practice=practiceRoute;
 const actual=new URL(cleanRoute?urls.actual:location.href,location.origin);
-if(!cleanRoute){actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','verified-descriptions-10');}
+if(!cleanRoute){actual.searchParams.delete('practice');actual.searchParams.set('resume','post-survey');actual.searchParams.set('v','official-12');}
 const training=new URL(cleanRoute?urls.tutorial:actual,location.origin);if(!cleanRoute)training.searchParams.set('practice','1');
-const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=verified-descriptions-10';document.head.append(css);
+const css=document.createElement('link');css.rel='stylesheet';css.href='../study/tutorial.css?v=official-12';document.head.append(css);
 if(!practice){
  const help=document.createElement('button');help.className='practice-help';help.textContent='사용 방법';help.addEventListener('click',()=>location.assign(training));document.body.append(help);
 }else{
@@ -35,8 +35,8 @@ if(!practice){
  window.addEventListener('practice-action',e=>{completed.add(e.detail);updateChecks();});
  new MutationObserver(updateDetail).observe(details,{attributes:true,attributeFilter:['hidden'],subtree:true});
  const end=document.createElement('dialog');end.className='practice-end';end.innerHTML='<h2>연습을 마쳤습니다.</h2><p>실제 카드로 자유롭게 분류해 보세요.<br>사용 방법은 분류 중에도 다시 열 수 있습니다.</p><div><button type="button" data-practice="restart">튜토리얼 다시 하기</button><button type="button" data-practice="understood">이해했어요!</button></div>';document.body.append(end);
- function restart(){document.querySelector('[data-action=reset-test]').click();completed.clear();index=0;render();}
+ function restart(){window.dispatchEvent(new Event('practice-reset'));completed.clear();index=0;render();}
  window.addEventListener('practice-before-confirm',event=>{if(!allReady())event.preventDefault();});
- window.addEventListener('practice-finished',()=>{if(allReady())end.showModal();});end.addEventListener('cancel',e=>e.preventDefault());end.addEventListener('click',e=>{const action=e.target.dataset.practice;if(action==='restart'){end.close();restart();}if(action==='understood'&&allReady()){if(integrated)sessionStorage.setItem('hyu-study-50-practice-done-required-v1','1');location.assign(actual);}});
+ window.addEventListener('practice-finished',()=>{if(allReady())end.showModal();});end.addEventListener('cancel',e=>e.preventDefault());end.addEventListener('click',e=>{const action=e.target.dataset.practice;if(action==='restart'){end.close();restart();}if(action==='understood'&&allReady()){if(integrated)sessionStorage.setItem(storageKeys.practiceDone,'1');location.assign(actual);}});
  render();restart();
 }

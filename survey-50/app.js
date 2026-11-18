@@ -1,11 +1,11 @@
-import { integrated, urls } from '../study-50/flow.js?v=verified-descriptions-10';
+import { integrated, urls, official, storageKeys, resetFollowingPre } from '../study-50/flow.js?v=official-12';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
 
-const VERSION = 'portal-experience-survey-selected-50-v1';
-const STORAGE_KEY = `hyu-portal-survey:${VERSION}${integrated ? ':study' : ''}`;
+const VERSION = official ? 'portal-experience-survey-live-2026-11-18-v1' : 'portal-experience-survey-selected-50-v1';
+const STORAGE_KEY = storageKeys.preDraft;
 const LEGACY_KEY = 'hyu-portal-survey:portal-experience-survey-selected-50-unused-legacy';
-const IS_TEST = true;
+const IS_TEST = !official;
 const frequencyOptions = [
   ['daily', '거의 매일'], ['weekly_2_3', '주 2~3회'], ['weekly_1', '주 1회'],
   ['monthly_1_3', '월 1~3회'], ['rarely', '거의 사용하지 않음'],
@@ -187,7 +187,7 @@ function buildRecord(a) {
   return {
     id: state.id, study_version: VERSION, is_test: IS_TEST,
     payload: {
-      schema_version: 2, kind: 'portal_experience_survey', study_mode: 'pilot', consent: a.consent,
+      schema_version: 2, kind: 'portal_experience_survey', study_mode: official ? 'live' : 'pilot', consent: a.consent,
       participant: { student_number: a.student_number.trim(), department: a.department.trim(), name: a.participant_name.trim() },
       answers: {
         portal_frequency: a.frequency, navigation_difficulty_frequency: a.difficulty,
@@ -234,7 +234,9 @@ form.addEventListener('submit', async event => {
     state.answers = readFields();
     const errors = errorsFor(state.answers);
     if (errors.length) { showErrors(errors); return; }
-    if (integrated) { sessionStorage.setItem('hyu-study-50-pre', JSON.stringify(buildRecord(state.answers))); persist(); location.assign(form.dataset.destination || urls.intro); return; }
+    if (integrated) { const record = buildRecord(state.answers);
+      if (official) { const previous = JSON.parse(sessionStorage.getItem(storageKeys.pre) || 'null'); const before = previous?.payload?.participant; const after = record.payload.participant; if (before && ['student_number','department','name'].some(key => before[key] !== after[key])) { resetFollowingPre(); state.id = crypto.randomUUID(); state.startedAt = new Date().toISOString(); record.id = state.id; record.payload.started_at = state.startedAt; } }
+      sessionStorage.setItem(storageKeys.pre, JSON.stringify(record)); persist(); location.assign(form.dataset.destination || urls.intro); return; }
     state.pending = buildRecord(state.answers); persist();
   }
   submitting = true; byId('submit-error').hidden = true; byId('validation-summary').hidden = true; syncUI();
@@ -254,8 +256,8 @@ ensureBlankFunction(); restoreFields(); syncUI(); persist();
 window.addEventListener('pagehide', () => { if (!state.pending && !state.done) { state.answers = readFields(); persist(); } });
 
 // Temporary shortcut for the development demo; never fabricate questionnaire answers.
-byId('skip-pre-survey').addEventListener('click',()=>{
- if(submitting||state.pending)return;
+byId('skip-pre-survey')?.addEventListener('click',()=>{
+ if(official||submitting||state.pending)return;
  sessionStorage.setItem('hyu-study-50-pre',JSON.stringify({skipped:true,reason:'development_demo',skipped_at_client:new Date().toISOString()}));
  location.assign(urls.intro);
 });

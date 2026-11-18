@@ -1,2 +1,2 @@
-import {urls} from './flow.js?v=verified-descriptions-10';
+import {urls} from './flow.js?v=official-12';
 document.querySelector('#understood-intro').addEventListener('click',()=>location.assign(urls.cards));

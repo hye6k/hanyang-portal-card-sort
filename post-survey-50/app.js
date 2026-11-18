@@ -1,13 +1,13 @@
-import { installDescriptions } from '../study/descriptions.js?v=verified-descriptions-10';
-import { integrated, urls, updateFlow, cleanRoute } from '../study-50/flow.js?v=verified-descriptions-10';
-import { cards as selectedCards } from '../canvas-50/cards.js?v=verified-descriptions-10';
+import { installDescriptions } from '../study/descriptions.js?v=official-12';
+import { integrated, urls, updateFlow, cleanRoute, official, storageKeys, sortStorage } from '../study-50/flow.js?v=official-12';
+import { cards as selectedCards } from '../canvas-50/cards.js?v=official-12';
 import { study } from '../site-config.js';
 import { sendResponse } from '../supabase-client.js';
 
-const VERSION = 'portal-post-sort-survey-selected-50-v1';
-const STORAGE_KEY = `hyu-post-sort-survey:${VERSION}${integrated ? ':study' : ''}`;
+const VERSION = official ? 'portal-post-sort-survey-live-2026-11-18-v1' : 'portal-post-sort-survey-selected-50-v1';
+const STORAGE_KEY = storageKeys.post;
 const LEGACY_KEY = 'hyu-post-sort-survey:selected-50-unused-legacy';
-const SORT_KEY = 'hyu-spatial-card-sort-selected-50-v1';
+const SORT_KEY = storageKeys.sort;
 const cards = selectedCards;
 const descriptionButton = installDescriptions(cards);
 const byId = id => document.getElementById(id), form = byId('post-form');
@@ -22,7 +22,7 @@ const clarityLabels = ['전혀 이해할 수 없었다', '이해하기 어려웠
 const criteria = [['similar_purpose', '기능의 목적이나 용도가 비슷한지'], ['similar_context', '기능을 사용하는 상황이 비슷한지'], ['expected_portal_location', '실제 포털에서 함께 있을 것 같은지'], ['familiar_menu_structure', '평소 사용하던 포털의 메뉴 구조'], ['other', '기타']];
 function readSort() {
   try {
-    const saved = JSON.parse(localStorage.getItem(SORT_KEY) || 'null'), review = saved?.review;
+    const saved = JSON.parse(sortStorage().getItem(SORT_KEY) || 'null'), review = saved?.review;
     if (!review || !Array.isArray(review.groups) || !Array.isArray(review.singles)) return null;
     const ids = [...review.groups.flatMap(group => group.cardIds), ...review.singles];
     if (ids.length !== cards.length || new Set(ids).size !== cards.length || ids.some(id => !cards.some(card => card.id === id))) return null;
@@ -178,15 +178,22 @@ form.addEventListener('input', event => {
 });
 function buildRecord() {
   const a = state.answers, answersFor = kind => a[kind].map(id => ({ card_id: id, reasons: [...a[`${kind}_reasons`][id].selected], other: a[`${kind}_reasons`][id].selected.includes('other') ? a[`${kind}_reasons`][id].other.trim() : null }));
-  return { id: state.id, study_version: VERSION, is_test: true, payload: { schema_version: 4, kind: 'portal_post_sort_survey', study_mode: 'pilot', workflow: integrated ? 'pre-sort-post-v1' : 'sort-select-questions-v1', ...(integrated ? { pre_survey: JSON.parse(sessionStorage.getItem('hyu-study-50-pre') || 'null') } : {}), consent: a.consent, cards: copy(cards), sort_result: copy(state.sort), answers: { group_reasons: state.sort.groups.map(group => ({group_id: group.id, group_name: group.name, card_ids: [...group.card_ids], reason: (a.group_reasons[group.id] || '').trim()})), difficult_none: a.difficult_none, difficult_cards: answersFor('difficult'), label_comprehension: a.clarity, naming_none: a.naming_none, naming_difficult_cards: answersFor('naming'), grouping_criteria: [...a.criterion], grouping_criterion_other: a.criterion.includes('other') ? a.criterion_other.trim() : null }, questionnaire: { sorting_reasons: Object.fromEntries(reasons.difficult), naming_reasons: Object.fromEntries(reasons.naming), label_comprehension_scale: Object.fromEntries(clarityLabels.map((label, i) => [i + 1, label])), grouping_criteria: Object.fromEntries(criteria) }, started_at: state.startedAt, submitted_at_client: new Date().toISOString() } };
+  return { id: state.id, study_version: VERSION, is_test: !official, payload: { schema_version: 4, kind: 'portal_post_sort_survey', study_mode: official ? 'live' : 'pilot', workflow: integrated ? 'pre-sort-post-v1' : 'sort-select-questions-v1', ...(integrated ? { pre_survey: JSON.parse(sessionStorage.getItem(storageKeys.pre) || 'null') } : {}), consent: a.consent, cards: copy(cards), sort_result: copy(state.sort), answers: { group_reasons: state.sort.groups.map(group => ({group_id: group.id, group_name: group.name, card_ids: [...group.card_ids], reason: (a.group_reasons[group.id] || '').trim()})), difficult_none: a.difficult_none, difficult_cards: answersFor('difficult'), label_comprehension: a.clarity, naming_none: a.naming_none, naming_difficult_cards: answersFor('naming'), grouping_criteria: [...a.criterion], grouping_criterion_other: a.criterion.includes('other') ? a.criterion_other.trim() : null }, questionnaire: { sorting_reasons: Object.fromEntries(reasons.difficult), naming_reasons: Object.fromEntries(reasons.naming), label_comprehension_scale: Object.fromEntries(clarityLabels.map((label, i) => [i + 1, label])), grouping_criteria: Object.fromEntries(criteria) }, started_at: state.startedAt, submitted_at_client: new Date().toISOString() } };
 }
 form.addEventListener('submit', async event => {
   event.preventDefault(); if (submitting || state.done) return;
   if (!state.pending) {
-    if (integrated && !sessionStorage.getItem('hyu-study-50-pre')) { location.assign(urls.pre); return; }
+    if (integrated && !sessionStorage.getItem(storageKeys.pre)) { location.assign(urls.pre); return; }
     state.answers = readAnswers();
     if (state.stage !== 'questions' || !state.sort) { showStage('select'); return; }
     state.sort = readSort(); if (!state.sort) { renderSelection(); showStage('select'); return; }
+    if (official) {
+      const pre = JSON.parse(sessionStorage.getItem(storageKeys.pre) || 'null');
+      const participant = pre?.payload?.participant;
+      if (pre?.skipped || !pre?.payload?.consent || !['student_number','department','name'].every(key => typeof participant?.[key] === 'string' && participant[key].trim())) { location.assign(urls.pre); return; }
+      if (sessionStorage.getItem(storageKeys.practiceDone) !== '1') { location.assign(urls.tutorial); return; }
+      if (!state.sort.confirmed || state.sort.groups.some(group => !group.name.trim())) { location.assign(urls.actual); return; }
+    }
     renderGroupReasons();
     const missingGroups = groupErrors(); if (missingGroups.length) { showStage('groups'); showErrors(missingGroups); return; }
     const errors = questionErrors(); if (errors.length) { showErrors(errors); return; }
