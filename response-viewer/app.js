@@ -1,99 +1,65 @@
-import {unpack,normalize,pairStats,difficultyStats} from './data.js?v=viewer-1';
-import {cards as sampleCards} from '../canvas-50/cards.js?v=verified-descriptions-10';
-const $=id=>document.getElementById(id), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const arr=v=>Array.isArray(v)?v:[], number=(v)=>typeof v==='number'&&v>=1&&v<=5?v:null;
-let records=[], cohortKeys=[], active=[], tab='overview', example=false;
-const labels={similar_purpose:'기능의 목적이나 용도',similar_context:'기능을 사용하는 상황',expected_portal_location:'포털에서 함께 있을 것 같은지',familiar_menu_structure:'기존 포털 메뉴 구조',other:'기타'};
-function status(message,issues=[]){$('status').textContent=message;$('issues').innerHTML=issues.map(s=>`<li>${esc(s)}</li>`).join('');}
-function bar(label,value,total){const pct=total?value/total*100:0;return `<div class="bar-row"><span>${esc(label)}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><span class="bar-value">${value}/${total}</span></div>`;}
-function rebuild(){
- const previous=cohortKeys[Number($('cohort').value)];
- cohortKeys=[...new Set(records.map(r=>r.cohort))];
- $('cohort').innerHTML=cohortKeys.map((key,i)=>{const subset=records.filter(r=>r.cohort===key);return `<option value="${i}">${esc(subset[0].version)} · 구성 ${i+1} · ${subset[0].cards.length}개 카드 · ${subset.length}개 응답</option>`;}).join('');
- const old=cohortKeys.indexOf(previous);if(old>=0)$('cohort').value=String(old);
- $('workspace').hidden=!records.length;$('example-note').hidden=!example;
- render();
+import {has,object,recordsFrom,inspect,fields} from './data.js?v=inspection-2';
+const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MISSING=Symbol('missing'),arr=v=>Array.isArray(v)?v:[],get=(o,k)=>has(o,k)?o[k]:MISSING;
+let sources=[],entries=[],current=null;
+function value(v){if(v===MISSING)return '항목 없음';if(v===null)return 'null';if(v==='')return '빈 문자열 ("")';if(v===true)return 'true';if(v===false)return 'false';return typeof v==='object'?JSON.stringify(v,null,2):String(v);}
+function answer(v){return `<div class="answer-value">${esc(value(v))}</div>`;}
+function dl(rows){return `<dl class="data-list">${rows.map(([name,v])=>`<dt>${esc(name)}</dt><dd>${esc(value(v))}</dd>`).join('')}</dl>`;}
+function section(id,title,body){return `<section class="question" id="${id}"><div class="question-heading"><h2>${esc(title)}</h2></div>${body}</section>`;}
+function entry(title,body){return `<div class="entry"><h3>${esc(title)}</h3>${body}</div>`;}
+function options(selected,dict,{multiple=false}={}){
+ const missing=selected===MISSING,items=multiple?arr(selected):[selected],map=object(dict),keys=[...new Set([...Object.keys(map),...items.filter(v=>v!==MISSING&&v!==null).map(String)])];
+ if(!keys.length)return answer(selected);
+ return `${missing?'<p class="muted">응답 항목 없음</p>':''}<div class="options read-only">${keys.map(key=>`<label class="choice"><input type="${multiple?'checkbox':'radio'}" disabled ${items.some(v=>String(v)===key)?'checked':''}><span>${esc(map[key]??key)}</span></label>`).join('')}</div>`;
 }
+function scale(selected,dict){const map=object(dict),keys=Object.keys(map);if(!keys.length)return answer(selected);return `<div class="scale read-only">${keys.map(key=>`<label class="scale-option"><input type="radio" disabled ${selected!==MISSING&&String(selected)===key?'checked':''}><span class="scale-number">${esc(key)}</span><span class="scale-label">${esc(map[key])}</span></label>`).join('')}</div><p class="selection-summary">저장된 응답: ${esc(value(selected))}</p>`;}
+function consent(v){return `<p class="check-state">동의 여부: ${esc(value(v))}</p>`;}
+function showPre(pre,preRow,p){
+ if(!has(p,'pre_survey'))return '<p class="muted">사전 설문 항목이 없습니다.</p>';
+ const a=object(pre.answers),q=object(pre.questionnaire),participant=object(pre.participant);
+ return `${dl([['사전 설문 ID',get(preRow,'id')],['사전 설문 버전',get(preRow,'study_version')],['사전 설문 is_test',get(preRow,'is_test')],['건너뛰기',get(pre,'skipped')],['건너뛴 이유',get(pre,'reason')],['건너뛴 시각',get(pre,'skipped_at_client')],['사전 설문 시작',get(pre,'started_at')],['사전 설문 제출',get(pre,'submitted_at_client')]])}
+ ${entry('01 기본정보',`<div class="identity-fields">${[['학번','student_number'],['학과','department'],['이름','name']].map(([label,key])=>`<div><span class="field-label">${label}</span>${answer(get(participant,key))}</div>`).join('')}</div>`)}
+ ${entry('02 한양대학교 포털을 얼마나 자주 사용하나요?',options(get(a,'portal_frequency'),q.frequency))}
+ ${entry('03 원하는 메뉴를 찾는 데 어려움을 겪은 경험이 있나요?',scale(get(a,'navigation_difficulty_frequency'),q.difficulty_scale))}
+ ${entry('04 찾기 어려웠던 기능이 있었다면 무엇인가요?',`<p class="check-state">해당 없음으로 저장: ${esc(value(get(a,'functions_not_applicable')))}</p>${!has(a,'difficult_functions')?answer(MISSING):!arr(a.difficult_functions).length?answer(a.difficult_functions):arr(a.difficult_functions).map((f,i)=>`<div class="view-row"><h4>${i+1}. ${esc(value(get(f,'function_name')))}</h4>${dl([['입력 ID',get(f,'id')],['회상 상태',get(f,'recall_status')]])}<h4>찾기 어려웠던 이유</h4>${options(get(object(f.difficulty_reasons),'selected'),q.reason_options,{multiple:true})}<h4>기타 이유</h4>${answer(get(object(f.difficulty_reasons),'other'))}</div>`).join('')}`)}
+ ${entry('05 현재 포털에서 원하는 기능을 쉽게 찾을 수 있다고 생각하나요?',scale(get(a,'perceived_navigation_ease'),q.ease_scale))}
+ ${entry('정보 수집 및 응답 제출 동의',consent(get(pre,'consent')))}`;
+}
+function cardName(cards,id){return cards.find(c=>c.id===id)?.name??`목록에 없는 카드: ${id}`;}
+function groupRender(g,i,cards,reasons){const members=arr(g.card_ids);return `<article class="group-surface tone-${Number.isInteger(g.tone)&&g.tone>=0&&g.tone<=3?g.tone:i%4}"><div class="group-heading"><h3>${esc(value(get(g,'name')))}</h3><span>${members.length}개</span></div>${members.map(id=>`<div class="group-item">${esc(cardName(cards,id))}<small>${esc(id)}</small></div>`).join('')}<div class="group-foot">${dl([['그룹 ID',get(g,'id')],['저장된 색상',get(g,'tone')],['추가 설명',reasons.find(r=>r.group_id===g.id)?.reason??MISSING]])}</div></article>`;}
+function showSort(sort,cards,a){
+ const groups=arr(sort.groups),singles=arr(sort.ungrouped_card_ids),all=[...groups.flatMap(g=>arr(g.card_ids)),...singles],known=new Set(cards.map(c=>c.id));
+ const absent=cards.filter(c=>!all.includes(c.id)),duplicates=[...new Set(all.filter((id,i)=>all.indexOf(id)!==i))],unknown=all.filter(id=>!known.has(id));
+ const check=absent.length||duplicates.length||unknown.length?`카드 누락 ${absent.length}개 · 중복 ${duplicates.length}개 · 알 수 없는 ID ${unknown.length}개`:`카드 ${cards.length}개가 각각 한 번씩 분류 결과에 포함되어 있습니다.`;
+ return `<p class="storage-note">그룹 ${groups.length}개 · 그룹에 배치한 카드 ${groups.reduce((n,g)=>n+arr(g.card_ids).length,0)}개 · 따로 둔 카드 ${singles.length}개<br>${esc(check)}<br>아래 배치는 저장된 소속 관계를 보여줍니다. 원래 캔버스 위치를 재현한 화면은 아닙니다.</p>${dl([['결과 출처',get(sort,'source')],['최종 확정',get(sort,'confirmed')],['확정 시각',get(sort,'confirmed_at')]])}<div class="entry">${groups.map((g,i)=>groupRender(g,i,cards,arr(a.group_reasons))).join('')}${!has(sort,'groups')?answer(MISSING):!groups.length?answer(sort.groups):''}</div>${entry('따로 둔 카드',!has(sort,'ungrouped_card_ids')?answer(MISSING):singles.length?singles.map(id=>`<div class="answer-value">${esc(cardName(cards,id))} · ${esc(id)}</div>`).join(''):answer(sort.ungrouped_card_ids))}${absent.length?entry('소속 정보가 없는 카드',answer(absent.map(c=>c.id))):''}${duplicates.length?entry('중복된 카드 ID',answer(duplicates)):''}${unknown.length?entry('카드 목록에 없는 ID',answer(unknown)):''}`;
+}
+function showPost(p,cards){const a=object(p.answers),q=object(p.questionnaire);
+ const selected=(key,none,reasonDict)=>`<p class="check-state">없음으로 저장: ${esc(value(get(a,none)))}</p>${!has(a,key)?answer(MISSING):!arr(a[key]).length?answer(a[key]):arr(a[key]).map(item=>`<div class="view-row"><h4>${esc(cardName(cards,item.card_id))}</h4>${dl([['카드 ID',get(item,'card_id')]])}${options(get(item,'reasons'),q[reasonDict],{multiple:true})}<h4>기타 이유</h4>${answer(get(item,'other'))}</div>`).join('')}`;
+ return `${entry('사후 질문 1 · 그룹 이름과 추가 설명',!has(a,'group_reasons')?answer(MISSING):arr(a.group_reasons).length?arr(a.group_reasons).map((r,i)=>`<div class="view-row"><h4>${i+1}. ${esc(value(get(r,'group_name')))}</h4>${dl([['그룹 ID',get(r,'group_id')],['카드 목록',get(r,'card_ids')]])}<h4>추가 설명</h4>${answer(get(r,'reason'))}</div>`).join(''):answer(a.group_reasons))}
+ ${entry('사후 질문 2 · 분류가 어려웠던 메뉴',selected('difficult_cards','difficult_none','sorting_reasons'))}
+ ${entry('사후 질문 2 · 명칭을 이해하기 어려웠던 메뉴',selected('naming_difficult_cards','naming_none','naming_reasons'))}
+ ${entry('사후 질문 3 · 카드에 적힌 명칭만으로 기능을 이해할 수 있었나요?',scale(get(a,'label_comprehension'),q.label_comprehension_scale))}
+ ${entry('사후 질문 3 · 기능을 그룹으로 묶을 때 어떤 기준을 고려했나요?',`${options(get(a,'grouping_criteria'),q.grouping_criteria,{multiple:true})}<h4>기타 기준</h4>${answer(get(a,'grouping_criterion_other'))}`)}
+ ${entry('응답 제출 동의',consent(get(p,'consent')))}`;
+}
+function showViews(sort,cards){const views=object(sort.description_views),keys=Object.keys(views);return `<p class="storage-note">설명 열람 기록 ${keys.length}개 카드. 기록이 없는 카드는 열람 횟수 0회로 단정하지 않습니다.</p>${!has(sort,'description_views')?answer(MISSING):!keys.length?answer(sort.description_views):keys.map(id=>{const v=object(views[id]);return `<article class="view-row"><h3>${esc(cardName(cards,id))}</h3>${dl([['카드 ID',id],['열람 횟수',get(v,'count')],['최초 열람 시각',get(v,'firstViewedAt')],['최종 열람 시각',get(v,'lastViewedAt')],['설명 버전',get(v,'descriptionVersion')]])}</article>`;}).join('')}`;}
+function showCards(cards,sort){const groups=arr(sort.groups),views=object(sort.description_views);return cards.length?cards.map((c,i)=>`<article class="card-source"><h3>${i+1}. ${esc(value(get(c,'name')))}</h3>${dl([['카드 ID',get(c,'id')],['최종 소속',groups.find(g=>arr(g.card_ids).includes(c.id))?.name??(arr(sort.ungrouped_card_ids).includes(c.id)?'따로 둔 카드':'소속 정보 없음')],['설명 열람 기록',has(views,c.id)?'기록 있음':'기록 없음']])}<h4>제출 시점에 저장된 기능 설명</h4>${answer(get(c,'description'))}</article>`).join(''):answer(cards);}
 function render(){
- const key=cohortKeys[Number($('cohort').value)],filter=$('test-filter').value;
- active=records.filter(r=>r.cohort===key&&(filter==='all'||r.isTest===filter));
- const mean=active.length?(active.reduce((sum,r)=>sum+r.groups.length,0)/active.length).toFixed(1):'—';
- const clarity=active.map(r=>number(r.answers.label_comprehension)).filter(v=>v!==null);
- $('stats').innerHTML=[['응답 수',active.length],['평균 그룹 수',mean],['평균 명칭 이해도',clarity.length?(clarity.reduce((a,b)=>a+b,0)/clarity.length).toFixed(1)+'/5':'—'],['따로 둔 카드가 있는 응답',active.filter(r=>r.ungrouped.length).length]].map(([name,value])=>`<div class="stat"><span>${name}</span><strong>${value}</strong></div>`).join('');
- overview();
- $('person').innerHTML=active.map((r,i)=>`<option value="${i}">${esc(personLabel(r,i))}</option>`).join('');
- individual();
- if(tab==='matrix')matrix();
+ current=entries[Number($('record').value)];if(!current)return;
+ const {source,value:raw,path}=current,{row,payload:p,preRow,pre}=inspect(raw),sort=object(p.sort_result),cards=arr(p.cards),a=object(p.answers);
+ const meta=dl([['불러온 파일',source.name],['선택한 응답 경로',path],['최종 제출 UUID',get(row,'id')],['최상위 is_test',get(row,'is_test')],['실험 버전',get(row,'study_version')],['DB 생성 시각',get(row,'created_at')],['응답 종류',get(p,'kind')],['저장 형식 버전',get(p,'schema_version')],['실험 모드',get(p,'study_mode')],['진행 흐름',get(p,'workflow')],['응답 시작 시각',get(p,'started_at')],['최종 제출 시각',get(p,'submitted_at_client')],['최종 동의',get(p,'consent')]]);
+ const note=`<p class="storage-note">이 화면은 불러온 JSON을 그대로 검토합니다. ${!has(row,'payload')?'payload 내용만 불러왔다면 최종 제출 UUID·is_test·DB 생성 시각 등 행 바깥 정보는 확인할 수 없습니다. 사전 설문 ID를 최종 제출 ID로 대신 사용하지 않습니다.':''}<br>저장되지 않은 행동은 재생할 수 없습니다. 현재 제출 형식은 최종 그룹과 설명 열람 요약을 담으며, 카드 이동 경로·되돌리기 이력·튜토리얼 조작 과정·설명 열람의 매회 시각은 담지 않습니다.</p>`;
+ $('report').innerHTML=section('meta','저장 정보',note+meta)+section('pre','사전 설문',showPre(pre,preRow,p))+section('sort','카드 분류 · 최종 그룹',showSort(sort,cards,a))+section('post','사후 질문',showPost(p,cards))+section('views','카드 설명 열람 기록',showViews(sort,cards))+section('cards','제출 당시 카드 목록과 설명',showCards(cards,sort));
+ const tree=fields(source.root);
+ $('coverage').textContent=`원본 파일의 ${tree.length}개 항목을 모두 표시합니다. 객체·배열도 각각 한 항목으로 포함합니다.`;
+ $('field-tree').innerHTML=tree.map(f=>`<div class="field-row${f.container?' field-container':''}" data-field-path="${esc(f.path)}"><span class="field-path">${esc(f.path)}</span><span class="field-type">${f.type}</span><span class="field-value">${esc(f.container?Array.isArray(f.value)?`배열 · ${f.value.length}개 항목${f.value.length?'':' []'}`:`객체 · ${Object.keys(f.value).length}개 필드${Object.keys(f.value).length?'':' {}'}`:JSON.stringify(f.value))}</span></div>`).join('');
+ $('raw-json').textContent=source.text;
 }
-function personLabel(r,i){const who=$('personal').checked?r.pre?.participant:{};return `응답 ${i+1}${who?.name?' · '+who.name:''}${who?.student_number?' · '+who.student_number:''} · ${r.isTest==='test'?'시험':r.isTest==='live'?'실제':'구분 미기록'}`;}
-function overview(){
- const cards=active[0]?.cards??[];
- for(const [id,key] of [['difficult-chart','difficult_cards'],['naming-chart','naming_difficult_cards']]){
-  const ranking=cards.map(c=>({c,...difficultyStats(active,c.id,key)})).filter(x=>x.count).sort((a,b)=>b.count-a.count).slice(0,15);
-  $(id).innerHTML=ranking.length?ranking.map(x=>bar(x.c.name,x.count,x.total)).join(''):'<p class="muted">선택된 카드가 없거나 해당 문항의 기록이 없습니다.</p>';
- }
- $('clarity-chart').innerHTML=[1,2,3,4,5].map(score=>bar(`${score}점`,active.filter(r=>number(r.answers.label_comprehension)===score).length,active.filter(r=>number(r.answers.label_comprehension)!==null).length)).join('');
- const eligible=active.filter(r=>Array.isArray(r.answers.grouping_criteria));
- const keys=[...new Set(eligible.flatMap(r=>r.answers.grouping_criteria))];
- $('criteria-chart').innerHTML=keys.length?keys.map(key=>bar(active.find(r=>r.p.questionnaire?.grouping_criteria?.[key])?.p.questionnaire.grouping_criteria[key]??labels[key]??key,eligible.filter(r=>r.answers.grouping_criteria.includes(key)).length,eligible.length)).join(''):'<p class="muted">기록된 분류 기준이 없습니다.</p>';
-}
-function namedReasons(item,dict){return [...arr(item.reasons).map(v=>dict?.[v]??v),...(item.other?[`기타: ${item.other}`]:[])].map(esc).join(' · ')||'이유 미기록';}
-function individual(){
- const r=active[Number($('person').value)];
- if(!r){$('person-detail').innerHTML='<p class="muted">표시할 응답이 없습니다.</p>';return;}
- const byId=new Map(r.cards.map(c=>[c.id,c]));
- const chips=ids=>ids.map(id=>{const c=byId.get(id);return `<button class="chip" data-card-detail="${esc(id)}" aria-label="${esc(c?.name??id)} 설명 보기">${esc(c?.name??id)}</button>`;}).join('');
- const reasons=arr(r.answers.group_reasons);
- const groupHtml=r.groups.map(g=>{const reason=reasons.find(a=>String(a.group_id)===g.id)?.reason;return `<article class="group"><div class="group-heading"><h3>${esc(g.name)}</h3><span>${g.card_ids.length}개</span></div><div class="chips">${chips(g.card_ids)}</div>${reason?`<p class="reason">${esc(reason)}</p>`:''}</article>`;}).join('');
- const loose=r.ungrouped.length?`<article class="group loose"><div class="group-heading"><h3>따로 둔 카드</h3><span>${r.ungrouped.length}개</span></div><div class="chips">${chips(r.ungrouped)}</div></article>`:'';
- const a=r.pre?.answers,q=r.pre?.questionnaire;
- const pre=a?`<p>이용 빈도: ${esc(q?.frequency?.[a.portal_frequency]??a.portal_frequency??'미기록')} · 탐색 어려움 빈도: ${esc(a.navigation_difficulty_frequency??'미기록')}/5 · 탐색 용이성: ${esc(a.perceived_navigation_ease??'미기록')}/5</p>${arr(a.difficult_functions).map(f=>`<div class="answer-item"><strong>${esc(f.function_name)}</strong><p>${arr(f.difficulty_reasons?.selected).map(v=>esc(q?.reason_options?.[v]??v)).join(' · ')}${f.difficulty_reasons?.other?' · '+esc(f.difficulty_reasons.other):''}</p></div>`).join('')}`:`<p class="muted">${r.pre?.skipped?'사전 설문을 건너뛴 응답입니다.':'사전 설문이 포함되지 않았습니다.'}</p>`;
- const answerCards=(key,dict)=>arr(r.answers[key]).length?arr(r.answers[key]).map(a=>`<div class="answer-item"><strong>${esc(byId.get(a.card_id)?.name??a.card_id)}</strong><p>${namedReasons(a,dict)}</p><p>${esc(byId.get(a.card_id)?.description??'')}</p></div>`).join(''):`<p class="muted">${Array.isArray(r.answers[key])?'선택한 카드가 없습니다.':'문항 기록이 없습니다.'}</p>`;
- const date=r.p.submitted_at_client??r.raw.created_at;
- $('person-detail').innerHTML=`<h2>${esc(personLabel(r,Number($('person').value)))}</h2><p class="muted">제출 ID: ${esc(r.id||'미기록')}${date?' · '+esc(date):''}</p>${r.warning?`<p class="notice">${esc(r.warning)}</p>`:''}<div class="groups">${groupHtml}${loose}</div><div class="answer-block"><h2>사전 설문</h2>${pre}</div><div class="answer-block"><h2>분류가 어려웠던 카드와 이유</h2>${answerCards('difficult_cards',r.p.questionnaire?.sorting_reasons)}</div><div class="answer-block"><h2>명칭이 어려웠던 카드와 이유</h2>${answerCards('naming_difficult_cards',r.p.questionnaire?.naming_reasons)}</div><div class="answer-block"><h2>명칭 이해도와 분류 기준</h2><p>명칭 이해도: ${esc(number(r.answers.label_comprehension)??'미기록')}/5</p><p>${arr(r.answers.grouping_criteria).map(v=>esc(r.p.questionnaire?.grouping_criteria?.[v]??labels[v]??v)).join(' · ')||'분류 기준 미기록'}${r.answers.grouping_criterion_other?' · '+esc(r.answers.grouping_criterion_other):''}</p></div>`;
-}
-let matrixCards=[];
-function matrix(){
- matrixCards=active[0]?.cards??[];
- const pairs=[];
- $('matrix-table').innerHTML=`<thead><tr><th scope="col">카드</th>${matrixCards.map(c=>`<th scope="col"><span>${esc(c.name)}</span></th>`).join('')}</tr></thead><tbody>${matrixCards.map((a,i)=>`<tr><th scope="row">${esc(a.name)}</th>${matrixCards.map((b,j)=>{
-  if(i===j)return '<td class="empty" aria-label="같은 카드">·</td>';
-  const s=pairStats(active,a.id,b.id);if(j>i&&s.together)pairs.push({a,b,...s});
-  const value=s.rate===null?'—':Math.round(s.rate*100);
-  return `<td${s.rate===null?' class="empty"':` style="background:rgb(${Math.round(35+s.rate*169)} ${Math.round(39+s.rate*193)} ${Math.round(29+s.rate*110)});color:${s.rate>.45?'#141b0b':'#f3f3ef'}"`}><button data-a="${i}" data-b="${j}" aria-label="${esc(a.name)}와 ${esc(b.name)}: ${s.together}/${s.eligible}${s.rate===null?' 집계 없음':', '+value+'%'}">${value}</button></td>`;
- }).join('')}</tr>`).join('')}</tbody>`;
- pairs.sort((a,b)=>b.rate-a.rate||b.eligible-a.eligible||b.together-a.together);
- $('pairs').innerHTML=pairs.length?pairs.slice(0,15).map(p=>`<div class="pair-row"><span>${esc(p.a.name)} ↔ ${esc(p.b.name)}</span><span>${Math.round(p.rate*100)}% · ${p.together}/${p.eligible}</span></div>`).join(''):'<p class="muted">함께 분류된 카드 쌍이 없습니다.</p>';
- $('pair-detail').textContent='표의 셀을 누르면 카드 이름과 실제 인원을 확인할 수 있습니다.';
-}
-async function importValues(sources){
- if(example){records=[];example=false;}
- const issues=[],known=new Map(records.map(r=>[r.id?'id:'+r.id:'body:'+JSON.stringify(r.raw),r]));let added=0,duplicates=0;
- for(const {name,value} of sources){
-  let rows;try{rows=unpack(value);}catch(e){issues.push(`${name}: ${e.message}`);continue;}
-  for(const [i,row]of rows.entries())try{
-   const r=normalize(row),key=r.id?'id:'+r.id:'body:'+JSON.stringify(r.raw),prev=known.get(key);
-   if(prev){duplicates++;if(JSON.stringify(prev.raw)!==JSON.stringify(r.raw))issues.push(`${name} ${i+1}번: 같은 UUID의 내용이 달라 먼저 불러온 응답을 유지했습니다.`);continue;}
-   known.set(key,r);records.push(r);added++;if(r.warning)issues.push(`${name} ${i+1}번: ${r.warning}`);
-  }catch(e){issues.push(`${name} ${i+1}번: ${e.message}`);}
- }
- status(`${added}개 추가 · 중복 ${duplicates}개 제외 · 총 ${records.length}개 응답`,issues);rebuild();
-}
-$('files').addEventListener('change',async e=>{const sources=[];for(const file of e.target.files)sources.push({name:file.name,value:await file.text()});await importValues(sources);e.target.value='';});
-$('load-paste').addEventListener('click',()=>importValues([{name:'붙여넣기',value:$('paste').value}]));
-$('clear').addEventListener('click',()=>{records=[];example=false;$('paste').value='';status('불러온 응답을 비웠습니다.');rebuild();});
-for(const id of ['test-filter','cohort'])$(id).addEventListener('change',render);
-$('person').addEventListener('change',individual);
-$('personal').addEventListener('change',()=>{const index=$('person').value;$('person').innerHTML=active.map((r,i)=>`<option value="${i}">${esc(personLabel(r,i))}</option>`).join('');$('person').value=index;individual();});
-document.querySelector('.tabs').addEventListener('click',e=>{const target=e.target.closest('[data-tab]');if(!target)return;tab=target.dataset.tab;for(const button of document.querySelectorAll('[data-tab]'))button.setAttribute('aria-pressed',String(button===target));for(const name of ['overview','individual','matrix'])$(name).hidden=name!==tab;if(tab==='matrix')matrix();});
-$('matrix-table').addEventListener('click',e=>{const cell=e.target.closest('[data-a]');if(!cell)return;const a=matrixCards[Number(cell.dataset.a)],b=matrixCards[Number(cell.dataset.b)],s=pairStats(active,a.id,b.id);$('pair-detail').textContent=`${a.name} ↔ ${b.name}: ${s.rate===null?'집계 가능한 응답이 없습니다.':`${s.together}/${s.eligible}개 응답에서 함께 분류 (${Math.round(s.rate*100)}%)`}`;});
-$('sample').addEventListener('click',()=>{
- records=[];example=true;$('paste').value='';document.querySelector('.import details').open=false;
- for(let i=0;i<3;i++){
-  const ids=sampleCards.map(c=>c.id),groups=[{id:'g1',name:'학업과 수업',card_ids:ids.slice(0,12+i)},{id:'g2',name:'신청과 학교생활',card_ids:ids.slice(12+i,30)},{id:'g3',name:'생활·행정 서비스',card_ids:ids.slice(30,48)}];
-  records.push(normalize({id:`example-${i+1}`,study_version:'예시 데이터',is_test:true,payload:{kind:'portal_post_sort_survey',cards:sampleCards,pre_survey:{skipped:true},sort_result:{groups,ungrouped_card_ids:ids.slice(48)},answers:{group_reasons:groups.map(g=>({group_id:g.id,reason:'화면을 살펴보기 위한 가상의 분류입니다.'})),difficult_cards:[{card_id:ids[i],reasons:['never_used']}],naming_difficult_cards:[{card_id:ids[2],reasons:['unfamiliar_term']}],label_comprehension:3+i%2,grouping_criteria:['similar_purpose']},questionnaire:{sorting_reasons:{never_used:'사용해 본 적이 없어서'},naming_reasons:{unfamiliar_term:'용어가 생소해서'}}}}));
- }
- status('가상의 예시 응답 3개를 표시합니다. 실제 연구 결과가 아닙니다.');rebuild();
-});
-
-$('person-detail').addEventListener('click',e=>{const button=e.target.closest('[data-card-detail]');if(!button)return;const r=active[Number($('person').value)],c=r?.cards.find(c=>c.id===button.dataset.cardDetail);if(!c)return;$('detail-name').textContent=c.name;$('detail-description').textContent=c.description||'기록된 설명이 없습니다.';$('card-dialog').showModal();});
+function rebuild(){entries=sources.flatMap(source=>recordsFrom(source.root).map(r=>({...r,source})));$('workspace').hidden=!entries.length;$('record').innerHTML=entries.map((r,i)=>{const {pre}=inspect(r.value),person=object(pre.participant);return `<option value="${i}">${esc(r.source.name)} · ${r.path}${person.name?' · '+esc(person.name):''}</option>`;}).join('');if(entries.length)render();}
+function load(inputs){const errors=[];let added=0;for(const input of inputs){try{const root=JSON.parse(input.text);sources.push({...input,root});added++;}catch(e){errors.push(`${input.name}: JSON을 읽지 못했습니다. ${e.message}`);}}$('status').textContent=`${added}개 파일 추가 · 총 ${sources.length}개 파일`;$('errors').textContent=errors.join('\n');rebuild();}
+$('load-paste').addEventListener('click',()=>load([{name:`붙여넣은 응답 ${sources.length+1}`,text:$('paste').value}]));
+$('files').addEventListener('change',async e=>{const results=await Promise.allSettled([...e.target.files].map(async file=>({name:file.name,text:await file.text()})));const errors=results.filter(r=>r.status==='rejected');load(results.filter(r=>r.status==='fulfilled').map(r=>r.value));if(errors.length)$('errors').textContent+='\n일부 파일을 읽지 못했습니다.';e.target.value='';});
+$('record').addEventListener('change',render);
+$('clear').addEventListener('click',()=>{sources=[];entries=[];current=null;$('paste').value='';$('report').replaceChildren();$('field-tree').replaceChildren();$('raw-json').textContent='';$('workspace').hidden=true;$('status').textContent='불러온 내용을 비웠습니다.';$('errors').textContent='';});
+$('download').addEventListener('click',()=>{if(!current)return;const url=URL.createObjectURL(new Blob([current.source.text],{type:'application/json;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=current.source.name.endsWith('.json')?current.source.name:'response-original.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+$('print').addEventListener('click',()=>window.print());
