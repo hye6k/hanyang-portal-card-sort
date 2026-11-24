@@ -15,6 +15,12 @@ if(!practice){
   {title:'그룹을 옮기고 수정해 보세요',text:'그룹 속 카드를 0.5초 꾹 눌러 함께 옮긴 뒤, 짧게 눌러 편집해 보세요.',tasks:[[['group_move'],'0.5초 꾹 누른 채 끌어 그룹 전체 이동하기'],[['rename'],'카드 짧게 누르기 → 소속 그룹 이름 변경'],[['detach'],'카드 짧게 누르기 → 이 카드를 그룹에서 빼기 (선택)']],tip:'마지막에 그룹 확인을 열어 이름과 소속을 점검하세요. 그룹이 없다면 사과와 바나나를 다시 묶어 보세요.',focus:['review']}
  ];
  const panel=document.createElement('section');panel.className='practice-guide';panel.setAttribute('aria-label','카드 분류 조작 연습');document.body.append(panel);
+ const allowSkip=document.body.hasAttribute('data-allow-practice-skip');
+ const skipButton=allowSkip?'<button type="button" data-practice="skip">건너뛰기</button>':'';
+ function goToCards(){
+  if(integrated)sessionStorage.setItem(storageKeys.practiceDone,'1');
+  location.assign(actual);
+ }
  let index=0;const completed=new Set();
  const required=[['pan','zoom'],['description','singleton'],['merge','split'],['group_move','rename']];
  const ready=step=>required[step].every(action=>completed.has(action));
@@ -29,14 +35,14 @@ if(!practice){
  }
  new ResizeObserver(updateDetail).observe(panel);
  window.addEventListener('resize',updateDetail);
- function render(){panel.innerHTML=`<div class="practice-guide-heading"><span>조작 연습 ${index+1} / ${steps.length}</span></div><h2>${steps[index].title}</h2><p>${steps[index].text}</p><ul class="practice-tasks">${steps[index].tasks.map((task,i)=>`<li data-practice-task="${i}"><span data-task-mark></span><span>${task[1]}</span></li>`).join('')}</ul><p class="practice-tip">${steps[index].tip}</p><p class="practice-tip">선택 항목을 제외한 조작을 완료하면 다음으로 넘어갈 수 있습니다.</p><div class="practice-guide-actions"><button type="button" data-practice="back" ${index===0?'disabled':''}>이전</button><button type="button" data-practice="next">${index===steps.length-1?'그룹 확인하기':'다음'}</button></div>`;
+ function render(){panel.innerHTML=`<div class="practice-guide-heading"><span>조작 연습 ${index+1} / ${steps.length}</span></div><h2>${steps[index].title}</h2><p>${steps[index].text}</p><ul class="practice-tasks">${steps[index].tasks.map((task,i)=>`<li data-practice-task="${i}"><span data-task-mark></span><span>${task[1]}</span></li>`).join('')}</ul><p class="practice-tip">${steps[index].tip}</p><p class="practice-tip">선택 항목을 제외한 조작을 완료하면 다음으로 넘어갈 수 있습니다.</p><div class="practice-guide-actions"><button type="button" data-practice="back" ${index===0?'disabled':''}>이전</button>${skipButton}<button type="button" data-practice="next">${index===steps.length-1?'그룹 확인하기':'다음'}</button></div>`;
  document.querySelectorAll('.practice-target').forEach(el=>el.classList.remove('practice-target'));for(const action of steps[index].focus)document.querySelector(`[data-action="${action}"]`)?.classList.add('practice-target');if(index===1)document.querySelector('[data-id="card-3"]')?.classList.add('practice-target');updateChecks();updateDetail();if(index>0)document.querySelector('[data-action=fit]').click();}
- panel.addEventListener('click',e=>{const action=e.target.dataset.practice;if(!action)return;document.querySelector('#close-card-detail').click();if(action==='back'&&index>0){index--;render();}if(action==='next'&&ready(index)){if(index<steps.length-1){index++;render();}else document.querySelector('[data-action=review]').click();}});
+ panel.addEventListener('click',e=>{const action=e.target.dataset.practice;if(!action)return;if(action==='skip'&&allowSkip){goToCards();return;}document.querySelector('#close-card-detail').click();if(action==='back'&&index>0){index--;render();}if(action==='next'&&ready(index)){if(index<steps.length-1){index++;render();}else document.querySelector('[data-action=review]').click();}});
  window.addEventListener('practice-action',e=>{completed.add(e.detail);updateChecks();});
  new MutationObserver(updateDetail).observe(details,{attributes:true,attributeFilter:['hidden'],subtree:true});
  const end=document.createElement('dialog');end.className='practice-end';end.innerHTML='<h2>연습을 마쳤습니다.</h2><p>실제 카드로 자유롭게 분류해 보세요.<br>사용 방법은 분류 중에도 다시 열 수 있습니다.</p><div><button type="button" data-practice="restart">튜토리얼 다시 하기</button><button type="button" data-practice="understood">이해했어요!</button></div>';document.body.append(end);
  function restart(){window.dispatchEvent(new Event('practice-reset'));completed.clear();index=0;render();}
  window.addEventListener('practice-before-confirm',event=>{if(!allReady())event.preventDefault();});
- window.addEventListener('practice-finished',()=>{if(allReady())end.showModal();});end.addEventListener('cancel',e=>e.preventDefault());end.addEventListener('click',e=>{const action=e.target.dataset.practice;if(action==='restart'){end.close();restart();}if(action==='understood'&&allReady()){if(integrated)sessionStorage.setItem(storageKeys.practiceDone,'1');location.assign(actual);}});
+ window.addEventListener('practice-finished',()=>{if(allReady())end.showModal();});end.addEventListener('cancel',e=>e.preventDefault());end.addEventListener('click',e=>{const action=e.target.dataset.practice;if(action==='restart'){end.close();restart();}if(action==='understood'&&allReady())goToCards();});
  render();restart();
 }
